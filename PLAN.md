@@ -116,7 +116,7 @@ findings under skipped["suppressed by comment"].
 **Accept:** Test: two identical literals, one with trailing `# exact: ignore`,
 yields exactly one finding, and -v shows the suppressed count.
 
-### Step 6: pyproject.toml configuration
+### Step 6: pyproject.toml configuration [DONE 2026-07-07]
 **Goal:** Projects configure exact without CLI flags.
 **Files:** new src/exact_linter/config.py, src/exact_linter/cli.py,
 tests/test_config.py
