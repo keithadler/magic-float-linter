@@ -7,11 +7,24 @@ on:
 
 jobs:
   test:
-    runs-on: ubuntu-latest
+    runs-on: ${{ matrix.os }}
     strategy:
       fail-fast: false
       matrix:
+        os: [ubuntu-latest]
         python-version: ["3.10", "3.11", "3.12", "3.13", "3.14"]
+        include:
+          # full version matrix on ubuntu (cheapest); cross-platform
+          # verification on one representative, widely-used version each -
+          # CRLF handling (fix.py), path exclusion matching, and
+          # ProcessPoolExecutor (spawn on Windows, fork on Linux/macOS -
+          # different worker-startup semantics) are all real platform-
+          # sensitive code paths this is meant to catch for real, not by
+          # reasoning about it
+          - os: windows-latest
+            python-version: "3.13"
+          - os: macos-latest
+            python-version: "3.13"
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
