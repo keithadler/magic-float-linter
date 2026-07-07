@@ -1,6 +1,7 @@
 import json
+from pathlib import Path
 
-from exact_linter.cli import iter_python_files, main
+from exact_linter.cli import is_test_file, iter_python_files, main
 
 
 def test_cli_finds_planted_constant(tmp_path, capsys):
@@ -55,6 +56,39 @@ def test_excludes_nested_venv_within_scanned_tree(tmp_path):
     (nested / "mod.py").write_text("y = 2\n")
     found = list(iter_python_files([str(tmp_path)]))
     assert found == [tmp_path / "app.py"]
+
+
+def test_is_test_file():
+    assert is_test_file(Path("test_foo.py"))
+    assert is_test_file(Path("foo_test.py"))
+    assert is_test_file(Path("pkg/tests/foo.py"))
+    assert is_test_file(Path("pkg/test/foo.py"))
+    assert not is_test_file(Path("pkg/foo.py"))
+    assert not is_test_file(Path("testing_utils.py"))  # not a test_*.py/*_test.py match
+
+
+def test_cli_exclude_tests(tmp_path, capsys):
+    (tmp_path / "foo.py").write_text("RAD = 0.017453292519943295\n")
+    (tmp_path / "test_foo.py").write_text("RAD2 = 0.017453292519943295\n")
+    code = main([str(tmp_path), "--exclude-tests"])
+    out = capsys.readouterr().out
+    assert code == 1
+    assert "1 recognized constant" in out
+    assert "test_foo.py" not in out
+
+
+def test_cli_exclude_tests_verbose_reports_count(tmp_path, capsys):
+    (tmp_path / "test_foo.py").write_text("RAD = 0.017453292519943295\n")
+    main([str(tmp_path), "--exclude-tests", "--exit-zero", "-v"])
+    out = capsys.readouterr().out
+    assert "1 test file(s) excluded" in out
+
+
+def test_cli_include_tests_by_default(tmp_path, capsys):
+    (tmp_path / "test_foo.py").write_text("RAD = 0.017453292519943295\n")
+    code = main([str(tmp_path)])
+    assert code == 1
+    assert "1 recognized constant" in capsys.readouterr().out
 
 
 def test_cli_github_format(tmp_path, capsys):

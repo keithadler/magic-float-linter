@@ -133,7 +133,7 @@ recognize()).
 number) with a suggestion; a literal matching it is found and reports the custom
 suggestion.
 
-### Step 8: default test-file damping
+### Step 8: default test-file damping [DONE 2026-07-07]
 **Goal:** Reduce noise: findings in test files are usually planted constants, not
 bugs (the stdlib scan is almost all test files).
 **Files:** src/exact_linter/cli.py, src/exact_linter/config.py, README.md,
@@ -144,6 +144,11 @@ excluding, skip files matching test_*.py, *_test.py, or any path segment named
 tests or test. Report the count under skipped.
 **Accept:** Test directory with test_foo.py and foo.py: --exclude-tests reports
 only foo.py findings.
+**Note:** shipped as a single `--exclude-tests` flag (default already "include",
+so no paired `--include-tests` was needed) and no config.py dependency (step 6
+not done yet). Excluded-file count is reported as a separate verbose line, not
+folded into the per-literal skipped-reasons table (different units: files vs.
+literals).
 
 ## Phase C - fix mode (steps 9-11)
 

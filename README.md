@@ -92,6 +92,7 @@ exact [paths ...]        scan files or directories (default: .)
   --format {text,json,github}   output format (default: text)
   --json                 shortcut for --format json
   --truncation-only      report only constants that also lose precision
+  --exclude-tests        skip test_*.py, *_test.py, and test(s)/ directories
   --min-surplus N        evidence threshold (default 2.0)
   --exit-zero            always exit 0, even with findings
   -v, --verbose          show counts of skipped literals
@@ -108,7 +109,11 @@ code-scanning setup required. Truncated constants are `::warning`, others are
 
 - Short literals (`0.5`, `1e-6`) - not enough evidence to claim anything.
 - Exactly representable fractions (`0.125`) - almost always intentional.
-- Values inside numeric data sequences - table data, not constants.
+- Values inside numeric data sequences - table data, not constants. This includes
+  short tuples/lists nested inside another container (an RGB triple inside a
+  colormap's list of triples, a coordinate pair inside a dict of named points) -
+  the nesting itself is the signal that it's a data table entry, even though the
+  inner tuple alone looks short enough to be "just a couple of constants".
 - Empirical coefficients from curve fits - they satisfy no exact relation, and the
   evidence gate correctly rejects near-misses.
 
