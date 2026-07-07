@@ -34,7 +34,8 @@ def _agrees(x: mpmath.mpf, y: mpmath.mpf, digits: int) -> bool:
 
 
 def _match_table(x: mpmath.mpf, digits: int) -> Match | None:
-    for value, entry in table():
+    rows = table()
+    for value, entry in rows:
         if _agrees(x, value, digits):
             return Match(
                 form=entry.form,
@@ -42,7 +43,7 @@ def _match_table(x: mpmath.mpf, digits: int) -> Match | None:
                 note=entry.note,
                 tier="table",
                 matched_digits=digits,
-                surplus=confidence.table_surplus(digits),
+                surplus=confidence.table_surplus(digits, len(rows)),
             )
     return None
 
