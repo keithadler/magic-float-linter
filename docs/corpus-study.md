@@ -50,6 +50,16 @@ statsmodels 0.14.6, Pillow 12.3.0, mpmath 1.3.0, scikit-image 0.26.0.
    horsepower-to-watt factors are truncated to 9 digits, though both are exactly
    defined conversion values.
 
+**None of these are a deliberate performance trade-off, and that's checkable, not
+just argued.** A Python float literal is parsed once, at compile time, into the
+same 64-bit double regardless of how many digits are in the source text - a
+6-digit and a 16-digit literal cost identically nothing at runtime. If precision
+were being traded for speed, the trade would buy nothing; there is no version of
+"optimize for speed" that leads to *fewer* digits in an already-free constant.
+The AutoLev file itself supports the mundane explanation: it calls numpy's exact
+`deg2rad`/`rad2deg` elsewhere, so the author wasn't avoiding precision on
+principle, just didn't reach for it in this one spot.
+
 ## Validation without a bug: the tool agreeing with human comments
 
 Two places where package authors documented the exact form in a comment and the
