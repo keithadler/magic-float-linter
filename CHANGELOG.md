@@ -62,6 +62,12 @@ all grew substantially; this is effectively the tool's first "real" release.
   the same model ruff and flake8 use. `--truncation-only`/`--near-miss-only`
   still work as sugar for `--select truncated`/`--select near-miss`.
   Configurable via `[tool.exact] select`/`ignore` in `pyproject.toml`.
+- **flake8 plugin**: `exact` registers itself under the `flake8.extension`
+  entry point automatically on install, prefixed `EXA` (`EXA001` recognized,
+  `EXA002` truncated, `EXA003` near-miss). Shares the same `[tool.exact]`
+  config, `--select`/`--ignore` composition, and `# exact: ignore[code]`
+  suppression as the standalone CLI. Sequence findings are out of scope for
+  the plugin - they don't fit flake8's single-location diagnostic model.
 
 ### Fixed
 

@@ -788,6 +788,36 @@ found this time, unlike every other "run it for real" pass this session -
 worth recording as a clean result precisely because the pattern elsewhere
 has been "the real environment finds something the reasoning didn't."
 
+### flake8 plugin [DONE 2026-07-07]
+**Goal:** item #3 from the "make it more feature complete" review - many teams
+already run flake8 in CI and don't want to add a second tool invocation.
+Lowers the bar for the exact legacy-codebase audience `--baseline` already
+targets: ride inside a pipeline they're already running, for free.
+**Files:** new flake8_plugin.py, pyproject.toml (`[project.entry-points.
+"flake8.extension"]`, `flake8>=7` added to the dev extra for testing),
+tests/test_flake8_plugin.py, README.md, CHANGELOG.md.
+**Scope decision:** flake8 already handles file discovery/exclusion, so the
+plugin only needs to turn one file's literals into flake8-style
+`(line, col, message, type)` diagnostics - it does not reimplement
+`iter_python_files`/exclude patterns. Reuses `extract_source_info`,
+`recognize`, and (importantly) `resolve_allowed_codes` from cli.py directly,
+rather than re-deriving similar-but-possibly-drifting select/ignore
+composition logic. Whole-sequence recognition is deliberately out of scope:
+it's informational-only and can span many elements across several lines,
+which doesn't fit flake8's single-location diagnostic model.
+**Codes:** `EXA001` recognized, `EXA002` truncated, `EXA003` near-miss -
+same three codes the CLI already tracks (`sequence` has no flake8 code,
+per the scope decision above).
+**Validated two ways, not just one:** unit tests instantiate `ExactChecker`
+directly (covers recognition, both suppression forms, config select/ignore,
+reading from disk vs. flake8-provided `lines`); a separate test shells out
+to the real `flake8` binary against a temp file, proving actual
+`flake8.extension` entry-point *discovery* works - `flake8 --version` also
+confirmed manually (`exact-linter: 0.2.0` appears in its plugin list).
+Direct-instantiation tests alone would not have caught an entry-point
+registration mistake; the subprocess test specifically would.
+244 tests, ruff + self-lint clean.
+
 ---
 
 ## Step ordering notes for the executor
