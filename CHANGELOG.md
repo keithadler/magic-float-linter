@@ -71,6 +71,11 @@ all grew substantially; this is effectively the tool's first "real" release.
 - **Near-miss for rationals**: typo detection now also applies to
   repeating-decimal fractions, not just named constants - `0.333331` reads
   as a typo'd `1/3` the same way `2.71827` reads as a typo'd `e`.
+- **GitHub Action** (`action.yml`): `uses: keithadler/magic-float-linter@v0.2.0`
+  in any workflow, no install step needed. Installs from the pinned ref itself,
+  not PyPI - works today and stays version-consistent with whatever ref is
+  pinned. Verified in this repo's own CI against planted fixtures (fails on a
+  real finding, passes on clean code, `fail-on-findings: false` never fails).
 
 ### Validated
 

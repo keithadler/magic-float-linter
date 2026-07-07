@@ -361,6 +361,24 @@ so findings appear as inline annotations on a PR's Files Changed tab with no
 code-scanning setup required. Truncated constants are `::warning`, others are
 `::notice`. This is what the project's own CI uses to self-lint `src/`.
 
+## GitHub Action
+
+No install step needed in your own workflow - this repo ships as an action:
+
+```yaml
+- uses: keithadler/magic-float-linter@v0.2.0
+  with:
+    paths: src/                                  # default: .
+    # format: github                             # text, json, github, or sarif
+    # args: --select truncated,near-miss          # any extra exact flags
+    # fail-on-findings: 'false'                   # informational only, never fails the job
+```
+
+It installs `exact` from the pinned ref itself (not PyPI - works today, and stays
+version-consistent with whatever ref you pin), then runs it and surfaces findings as
+inline annotations by default. Pin to a tag (`@v0.2.0`) for stability or `@main` for
+the latest.
+
 ## What it will not flag
 
 - Short literals (`0.5`, `1e-6`) - not enough evidence to claim anything.

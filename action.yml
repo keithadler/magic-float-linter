@@ -1,0 +1,66 @@
+name: 'exact'
+description: 'Find hardcoded numbers that are secretly exact mathematical constants, typed by hand and typed wrong'
+author: 'Keith Adler'
+branding:
+  icon: 'search'
+  color: 'purple'
+
+inputs:
+  paths:
+    description: 'Files or directories to scan (space-separated for more than one)'
+    required: false
+    default: '.'
+  format:
+    description: 'Output format: text, json, github (inline PR annotations), or sarif'
+    required: false
+    default: 'github'
+  args:
+    description: >-
+      Extra arguments passed straight to exact, e.g.
+      "--select truncated,near-miss --exclude-tests"
+    required: false
+    default: ''
+  fail-on-findings:
+    description: 'Fail the job when findings are reported. Set to false for an informational-only check'
+    required: false
+    default: 'true'
+  python-version:
+    description: 'Python version to run exact with'
+    required: false
+    default: '3.12'
+
+runs:
+  using: 'composite'
+  steps:
+    - name: Set up Python
+      uses: actions/setup-python@v5
+      with:
+        python-version: ${{ inputs.python-version }}
+
+    - name: Install exact
+      shell: bash
+      # Installed from this action's own checked-out ref, not PyPI - stays
+      # version-consistent with whatever ref is pinned (@v0.2.0, @main, a
+      # commit SHA), and needs no separate release process to work at all.
+      run: python -m pip install --quiet "${{ github.action_path }}"
+
+    - name: Run exact
+      shell: bash
+      # Inputs are passed via env, not spliced directly into the script body
+      # - the standard GitHub Actions guard against script injection from
+      # input values (including the action's own inputs, not just external
+      # untrusted data).
+      env:
+        EXACT_PATHS: ${{ inputs.paths }}
+        EXACT_FORMAT: ${{ inputs.format }}
+        EXACT_ARGS: ${{ inputs.args }}
+        EXACT_FAIL_ON_FINDINGS: ${{ inputs.fail-on-findings }}
+      run: |
+        set +e
+        exact $EXACT_PATHS --format "$EXACT_FORMAT" $EXACT_ARGS
+        code=$?
+        set -e
+        if [ "$EXACT_FAIL_ON_FINDINGS" = "false" ]; then
+          exit 0
+        fi
+        exit "$code"

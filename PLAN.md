@@ -893,6 +893,45 @@ good calibration looks like at that surplus level, not evidence of a leak.
 **No formula change was needed** - a genuinely clean result, recorded as
 such rather than as a lead-in to a fix.
 
+### GitHub Action [DONE 2026-07-07]
+**Goal:** item #2 from the "what would really make this useful" review -
+using `exact` in someone else's CI currently means them running
+`pip install exact-linter` themselves. A published, reusable Action
+(`uses: keithadler/magic-float-linter@v0.2.0`) removes that step entirely -
+the lowest-friction adoption path available, and buildable without waiting
+on anything else (doesn't need PyPI, doesn't need Keith's action).
+**Files:** new action.yml (repo root - required location for `uses:
+owner/repo@ref` to resolve it), .github/workflows/ci.yml (new
+`action-selftest` job), README.md.
+**Key design decision - install from the action's own ref, not PyPI:**
+`pip install "${{ github.action_path }}"` installs whatever version of the
+tool is checked out at the ref being used (`@v0.2.0`, `@main`, a commit
+SHA) - works today, before any PyPI publish, and needs no separate release
+process to keep working afterward either. This is also just more correct
+long-term: a consumer pinning `@v0.2.0` gets exactly v0.2.0's recognition
+behavior, not whatever happens to be latest on PyPI at the time.
+**Security decision:** all four inputs (`paths`, `format`, `args`,
+`fail-on-findings`) are passed to the run step via `env:`, not spliced
+directly into the script body via `${{ }}` - the standard GitHub Actions
+guard against script injection from input values, applied even though
+these particular inputs come from the consuming workflow's own trusted
+YAML rather than external untrusted data.
+**Validated two ways:** the install-and-run logic was simulated locally
+first (a real venv install + the exact env-var/exit-code script, run
+against planted dirty/clean fixtures and both `fail-on-findings` settings)
+to catch obvious bugs before relying on CI alone; then a real
+`action-selftest` CI job was added that invokes this repo's own action via
+`uses: ./` against the same planted fixtures - proving the actual composite
+-action install-and-run path a consumer's workflow would hit, not just that
+action.yml is well-formed YAML. Both confirmed all three cases: fails on a
+real finding, passes on clean code, `fail-on-findings: false` never fails
+regardless of findings.
+**Also created:** a `v0.2.0` git tag, so `@v0.2.0` is a real, usable
+reference. A bare tag push does not trigger release.yml (which only fires
+on a GitHub Release *publish* event, a separate and more deliberate action
+still left for Keith) - confirmed safe to create without any risk of an
+unintended PyPI publish attempt.
+
 ---
 
 ## Step ordering notes for the executor

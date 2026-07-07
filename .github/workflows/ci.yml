@@ -34,3 +34,43 @@ jobs:
       - run: pytest -q
       - run: ruff check .
       - run: exact src/ --format github
+
+  action-selftest:
+    # Verifies action.yml actually works end-to-end - not just that the YAML
+    # is well-formed. `uses: ./` runs this repo's own action against planted
+    # fixtures, exercising the real composite-action install-and-run path a
+    # consumer's workflow would hit.
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Create fixtures
+        run: |
+          mkdir -p /tmp/fixture-dirty /tmp/fixture-clean
+          echo 'RAD_PER_DEG = 0.017453292519943295' > /tmp/fixture-dirty/planted.py
+          echo 'x = 1' > /tmp/fixture-clean/clean.py
+
+      - name: Action should fail on a real finding
+        id: dirty
+        uses: ./
+        continue-on-error: true
+        with:
+          paths: /tmp/fixture-dirty
+
+      - name: Assert it failed
+        run: |
+          if [ "${{ steps.dirty.outcome }}" != "failure" ]; then
+            echo "expected the dirty-fixture step to fail; outcome was ${{ steps.dirty.outcome }}"
+            exit 1
+          fi
+
+      - name: Action should pass on clean code
+        uses: ./
+        with:
+          paths: /tmp/fixture-clean
+
+      - name: fail-on-findings=false must not fail even with a real finding
+        uses: ./
+        with:
+          paths: /tmp/fixture-dirty
+          fail-on-findings: 'false'
