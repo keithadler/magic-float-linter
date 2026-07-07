@@ -72,6 +72,31 @@ Because the metric is the *magnitude* of lost precision, it even distinguishes a
 constant from a merely short one: `2.71827` (a typo for e) scores worse than a correctly
 rounded `2.71828`. Use `--truncation-only` to hunt precision bugs specifically.
 
+## Historical physical constants
+
+The 2019 SI redefinition made the Boltzmann constant, Avogadro's number,
+Planck's constant, and the elementary charge *exact*, which changed the
+recommended values of everything derived from them (the gas constant,
+vacuum permittivity, the fine-structure constant, and more). Code written
+before 2019 - or deliberately pinned to an older revision for
+reproducibility - often carries the older, superseded-but-was-correct
+values. `exact` recognizes several CODATA-2010 values explicitly, so they
+show up as historical facts instead of being silently missed or (worse)
+misdiagnosed as truncated:
+
+```
+$ exact identify 8.3144621
+8.3144621 = gas constant R (CODATA 2010)
+  suggestion: scipy.constants.R
+  note: superseded; current CODATA value is 8.31446261815324 (exact since 2019, k and N_A are now both exact)
+  confidence: matches all 8 given digits, surplus 5.9
+```
+
+This is never flagged as truncated or as a likely typo - it's the exact
+value that revision recommended, not a bug. The suggestion points at
+today's value for anyone who wants to modernize deliberately; `--fix` never
+applies it automatically, since it isn't a bit-identical rewrite.
+
 ## Near-miss detection (likely typos)
 
 A truncation is a *faithful* short constant - `3.14159` really is pi, just shortened.

@@ -152,18 +152,27 @@ def _match_table(
     x: mpmath.mpf, digits: int, extra: tuple[ConstantEntry, ...] = ()
 ) -> Match | None:
     rows = table(extra)
+    # Pick the closest agreeing entry, not the first in table order: some
+    # constants sit within each other's tolerance window at low precision
+    # (a superseded CODATA value can be within the current value's matching
+    # tolerance, and vice versa), and the literal should be attributed to
+    # whichever it actually equals, not whichever happens to be listed first.
+    best: tuple[mpmath.mpf, ConstantEntry] | None = None
     for value, entry in rows:
-        if _agrees(x, value, digits):
-            return Match(
-                form=entry.form,
-                suggestion=entry.suggestion,
-                note=entry.note,
-                tier="table",
-                matched_digits=digits,
-                surplus=confidence.table_surplus(digits, len(rows)),
-                precision_lost=_precision_lost(x, value),
-                near_miss=entry.decimal is None and _is_near_miss(x, value, digits),
-            )
+        if _agrees(x, value, digits) and (best is None or abs(x - value) < abs(x - best[0])):
+            best = (value, entry)
+    if best is not None:
+        value, entry = best
+        return Match(
+            form=entry.form,
+            suggestion=entry.suggestion,
+            note=entry.note,
+            tier="table",
+            matched_digits=digits,
+            surplus=confidence.table_surplus(digits, len(rows)),
+            precision_lost=_precision_lost(x, value),
+            near_miss=entry.decimal is None and _is_near_miss(x, value, digits),
+        )
     # Reciprocal folding: a literal may be 1/entry for an entry we listed
     # only in its plain form. This extends the table's reach to every
     # reciprocal for free, at a small confidence charge for the wider search.
