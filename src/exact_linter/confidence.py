@@ -42,3 +42,14 @@ def rational_surplus(digits: int, numerator: int, denominator: int) -> float:
 def pslq_surplus(digits: int, expr: str) -> float:
     names = len(re.findall(r"[a-zA-Z_]+", expr))
     return digits - integer_digit_cost(expr) - names - PSLQ_SEARCH_DIGITS
+
+
+# same order as the additive PSLQ tier: a handful of small-integer bases,
+# searched over rational exponents
+LOGSPACE_SEARCH_DIGITS = 6.0
+
+
+def logspace_surplus(digits: int, exponent_cost: int) -> float:
+    # the "1" mirrors pslq_surplus's per-name charge: pi is the only named
+    # constant this tier uses (and is always present, by construction)
+    return digits - exponent_cost - 1 - LOGSPACE_SEARCH_DIGITS

@@ -72,3 +72,35 @@ def test_long_typed_pi_beyond_double():
     match = recognize("3.14159265358979323846264338327950288")
     assert match is not None
     assert match.form == "pi"
+
+
+def test_logspace_fractional_root_over_pi():
+    # 2**(1/3) / pi - a fractional exponent, not expressible by the additive
+    # PSLQ tier's basis and not already covered by table/reciprocal folding
+    match = recognize("0.40104532599259912")
+    assert match is not None
+    assert match.tier == "logspace"
+    assert match.form == "2**(1/3)*pi**-1"
+    assert match.suggestion == "2**(1/3)*math.pi**-1"
+
+
+def test_logspace_two_bases_with_fractional_exponent():
+    match = recognize("0.49396778800781745")
+    assert match is not None
+    assert match.tier == "logspace"
+    assert match.form == "3**(2/5)*pi**-1"
+    assert match.suggestion == "3**(2/5)*math.pi**-1"
+
+
+def test_logspace_rejects_pure_rational():
+    # 3/2 has no pi factor - that's the rational tier's call, not logspace's
+    match = recognize("1.500000000000")
+    assert match is None or match.tier != "logspace"
+
+
+def test_logspace_known_miss_needs_wider_prime_basis():
+    # 7/8 * (4/11)**(4/3), the ACDM neutrino energy-density correction found
+    # (undetected) in astropy's cosmology module during the corpus study.
+    # Needs primes 7 and 11, outside our basis of {2, 3, 5, pi} - documenting
+    # this as a known, deliberate limitation rather than silently missing it.
+    assert recognize("0.22710731766") is None

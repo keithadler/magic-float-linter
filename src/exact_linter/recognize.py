@@ -23,6 +23,12 @@ PSLQ_MIN_DIGITS = 10  # PSLQ combos need strong evidence; skip short literals
 PSLQ_CONSTANTS = ("pi", "e", "ln(2)", "sqrt(2)", "sqrt(3)")
 MAX_RATIONAL_DENOMINATOR = 10_000
 
+LOGSPACE_MIN_DIGITS = 12
+# 2, 3, 5, pi: independent primes plus pi. Deliberately excludes 10 (=2*5) -
+# including it creates a built-in linear dependency (ln10 - ln2 - ln5 = 0)
+# that PSLQ finds instead of any real relation involving x.
+LOGSPACE_BASES = (2, 3, 5)
+
 # A Python float carries about this many significant decimal digits
 # (53 * log10(2)). A literal accurate to fewer digits than the exact form
 # would give has lost precision.
@@ -35,7 +41,7 @@ class Match:
     form: str  # exact form, e.g. "pi/180"
     suggestion: str  # replacement code, e.g. "math.pi / 180"
     note: str
-    tier: str  # "table" | "rational" | "pslq"
+    tier: str  # "table" | "rational" | "pslq" | "logspace"
     matched_digits: int
     surplus: float
     precision_lost: int = 0  # digits of accuracy lost vs. the exact form
@@ -226,12 +232,71 @@ def _match_pslq(x: mpmath.mpf, digits: int) -> Match | None:
     )
 
 
+def _format_logspace_factor(base: str, exp: Fraction) -> str:
+    if exp == 1:
+        return base
+    if exp.denominator == 1:
+        return f"{base}**{exp.numerator}"
+    return f"{base}**({exp.numerator}/{exp.denominator})"
+
+
+def _match_logspace(x: mpmath.mpf, digits: int) -> Match | None:
+    """Multiplicative relations like 8/pi or 6/pi**2 - a monomial in a few
+    small primes and pi - that the additive PSLQ tier can't express."""
+    if digits < LOGSPACE_MIN_DIGITS or x <= 0:
+        return None
+    with mpmath.workdps(max(digits, 16) + 10):
+        try:
+            basis = (
+                [mpmath.log(x)]
+                + [mpmath.log(b) for b in LOGSPACE_BASES]
+                + [mpmath.log(mpmath.pi)]
+            )
+            rel = mpmath.pslq(
+                basis, tol=mpmath.mpf(10) ** (2 - digits), maxcoeff=64, maxsteps=2000
+            )
+        except Exception:
+            return None
+    if rel is None or rel[0] == 0:
+        return None
+    c0 = rel[0]
+    if rel[-1] == 0:
+        # no pi factor: x is a plain rational in disguise, the rational
+        # tier's call to make (and it already declined, or we'd not be here)
+        return None
+    factors = []
+    for base, c in zip((*LOGSPACE_BASES, "pi"), rel[1:]):
+        if c != 0:
+            factors.append((str(base), Fraction(-c, c0)))
+    with mpmath.workdps(digits + 20):
+        value = mpmath.mpf(1)
+        for base, exp in factors:
+            base_value = mpmath.pi if base == "pi" else mpmath.mpf(base)
+            value *= base_value ** (mpmath.mpf(exp.numerator) / exp.denominator)
+        if not _agrees(x, value, digits):
+            return None
+        lost = _precision_lost(x, value)
+    form = "*".join(_format_logspace_factor(base, exp) for base, exp in factors)
+    exponent_cost = sum(
+        len(str(abs(exp.numerator))) + len(str(exp.denominator)) for _, exp in factors
+    )
+    return Match(
+        form=form,
+        suggestion=_to_python(form),
+        note="found by log-space PSLQ search",
+        tier="logspace",
+        matched_digits=digits,
+        surplus=confidence.logspace_surplus(digits, exponent_cost),
+        precision_lost=lost,
+    )
+
+
 def recognize(text: str, min_surplus: float = confidence.DEFAULT_MIN_SURPLUS) -> Match | None:
     """Try to recognize a float literal (given as source text) as an exact form."""
     digits = significant_digits(text)
     with mpmath.workdps(max(digits, 15) + 25):
         x = mpmath.mpf(text.replace("_", ""))
-        for finder in (_match_table, _match_rational, _match_pslq):
+        for finder in (_match_table, _match_rational, _match_pslq, _match_logspace):
             match = finder(x, digits)
             if match is not None and match.surplus >= min_surplus:
                 return match
