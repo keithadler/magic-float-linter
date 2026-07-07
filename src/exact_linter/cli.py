@@ -60,7 +60,11 @@ def is_test_file(path: Path) -> bool:
 
 
 def scan_file(
-    file: Path, min_surplus: float, truncation_only: bool, min_digits: int = MIN_DIGITS
+    file: Path,
+    min_surplus: float,
+    truncation_only: bool,
+    min_digits: int = MIN_DIGITS,
+    extra_entries: tuple = (),
 ) -> tuple[list[Finding], dict[str, int]]:
     """Scan one file; top-level so ProcessPoolExecutor can pickle it."""
     findings: list[Finding] = []
@@ -74,7 +78,7 @@ def scan_file(
         if reason is not None:
             skipped[reason] += 1
             continue
-        match = recognize(literal.text, min_surplus=min_surplus)
+        match = recognize(literal.text, min_surplus=min_surplus, extra_entries=extra_entries)
         if match is None:
             skipped["no confident match"] += 1
         elif truncation_only and not match.truncated:
@@ -171,6 +175,7 @@ def main(argv: Sequence[str] | None = None) -> int:
         min_surplus=min_surplus,
         truncation_only=truncation_only,
         min_digits=min_digits,
+        extra_entries=config.constants,
     )
     findings: list[Finding] = []
     skipped: Counter[str] = Counter()

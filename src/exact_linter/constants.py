@@ -279,14 +279,22 @@ _NAMESPACE_NAMES = (
 
 
 @lru_cache(maxsize=1)
-def table() -> tuple[tuple[mpmath.mpf, ConstantEntry], ...]:
-    """The full lookup table as (high-precision value, entry) rows."""
+def table(
+    extra: tuple[ConstantEntry, ...] = (),
+) -> tuple[tuple[mpmath.mpf, ConstantEntry], ...]:
+    """The full lookup table as (high-precision value, entry) rows.
+
+    `extra` adds project-specific entries (from [tool.exact.constants]);
+    they must carry a decimal value string. Results are cached per extra
+    tuple, so pass the same tuple object between calls where possible.
+    """
     rows: list[tuple[mpmath.mpf, ConstantEntry]] = []
     with mpmath.workdps(60):
         namespace = {name: getattr(mpmath, name) for name in _NAMESPACE_NAMES}
         for entry in MATH_ENTRIES:
             value = mpmath.mpf(eval(entry.form, {"__builtins__": {}}, namespace))
             rows.append((value, entry))
-        for entry in PHYSICAL_ENTRIES:
-            rows.append((mpmath.mpf(entry.decimal), entry))
+        for entry in PHYSICAL_ENTRIES + extra:
+            if entry.decimal is not None:
+                rows.append((mpmath.mpf(entry.decimal), entry))
     return tuple(rows)

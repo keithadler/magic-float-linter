@@ -12,6 +12,8 @@ import sys
 from dataclasses import dataclass
 from pathlib import Path
 
+from .constants import ConstantEntry
+
 if sys.version_info >= (3, 11):
     import tomllib
 else:  # pragma: no cover - exercised only on Python 3.10
@@ -25,7 +27,26 @@ class Config:
     exclude: tuple[str, ...] = ()  # fnmatch globs against the file path
     truncation_only: bool = False
     exclude_tests: bool = False
+    constants: tuple[ConstantEntry, ...] = ()  # project-specific table entries
     source: Path | None = None  # the pyproject.toml the config came from
+
+
+def _parse_constants(section: dict) -> tuple[ConstantEntry, ...]:
+    """[tool.exact.constants] maps a name to {value, suggestion, note}."""
+    raw = _get(section, "constants") or {}
+    entries = []
+    for name, spec in raw.items():
+        if not isinstance(spec, dict) or "value" not in spec:
+            continue
+        entries.append(
+            ConstantEntry(
+                form=name,
+                suggestion=str(spec.get("suggestion", name)),
+                note=str(spec.get("note", "project constant")),
+                decimal=str(spec["value"]),
+            )
+        )
+    return tuple(entries)
 
 
 def _get(section: dict, key: str):
@@ -54,6 +75,7 @@ def load_config(start: Path) -> Config:
             exclude=tuple(_get(section, "exclude") or ()),
             truncation_only=bool(_get(section, "truncation_only") or False),
             exclude_tests=bool(_get(section, "exclude_tests") or False),
+            constants=_parse_constants(section),
             source=pyproject,
         )
     return Config()

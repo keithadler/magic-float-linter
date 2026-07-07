@@ -129,7 +129,7 @@ overrides defaults. Wire min_digits into triage via parameter (default stays 6).
 **Accept:** Test with a tmp pyproject.toml setting min_surplus = 5.0 suppresses a
 finding that appears with the default. Precedence test: CLI flag beats config.
 
-### Step 7: user-defined constants
+### Step 7: user-defined constants [DONE 2026-07-07]
 **Goal:** Projects can add domain constants to the table.
 **Files:** src/exact_linter/config.py, src/exact_linter/constants.py,
 tests/test_config.py

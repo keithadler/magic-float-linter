@@ -181,6 +181,11 @@ min_digits = 6           # ignore literals with fewer significant digits
 exclude = ["generated/*", "vendored/*"]   # fnmatch globs
 truncation_only = false
 exclude_tests = false
+
+# project-specific constants join the recognition table (and get
+# truncation detection for free)
+[tool.exact.constants]
+plastic = { value = "1.32471795724474602596", suggestion = "PLASTIC_NUMBER", note = "plastic ratio" }
 ```
 
 ## pre-commit
