@@ -1,6 +1,6 @@
 import json
 
-from exact_linter.cli import main
+from exact_linter.cli import iter_python_files, main
 
 
 def test_cli_finds_planted_constant(tmp_path, capsys):
@@ -36,6 +36,25 @@ def test_cli_json_output(tmp_path, capsys):
     assert data[0]["line"] == 1
     assert data[0]["truncated"] is False
     assert data[0]["precision_lost"] == 0
+
+
+def test_scans_a_directory_that_lives_inside_site_packages(tmp_path):
+    # scanning a package installed under .../site-packages/pkg must still
+    # find its files: "site-packages" is an ancestor of the scan root here,
+    # not something nested inside it
+    pkg_dir = tmp_path / "venv" / "lib" / "site-packages" / "mypkg"
+    pkg_dir.mkdir(parents=True)
+    (pkg_dir / "mod.py").write_text("x = 1\n")
+    assert list(iter_python_files([str(pkg_dir)])) == [pkg_dir / "mod.py"]
+
+
+def test_excludes_nested_venv_within_scanned_tree(tmp_path):
+    (tmp_path / "app.py").write_text("x = 1\n")
+    nested = tmp_path / ".venv" / "lib" / "site-packages" / "dep"
+    nested.mkdir(parents=True)
+    (nested / "mod.py").write_text("y = 2\n")
+    found = list(iter_python_files([str(tmp_path)]))
+    assert found == [tmp_path / "app.py"]
 
 
 def test_cli_github_format(tmp_path, capsys):
