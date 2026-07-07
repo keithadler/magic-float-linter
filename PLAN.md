@@ -295,7 +295,26 @@ example fail the default surplus threshold. Stdlib scan: 0 logspace findings
 doubled (33s -> 66s) since every 12+ digit literal surviving earlier tiers now
 runs an extra PSLQ search; a real cost for step 21 (performance) to address.
 
-### Step 19: minimal-polynomial tier for quadratic algebraics
+### Step 19: minimal-polynomial tier for quadratic algebraics [SKIPPED 2026-07-07]
+**Decision: not building this.** Evaluated empirically and it fails the
+cost/benefit test:
+- The existing additive PSLQ tier (`mpmath.identify`) already recognizes
+  real quadratic surds, including this step's own motivating example: it
+  resolves `(1+sqrt(3))/2`, `(5+sqrt(13))/6`, `sqrt(2)-1`, etc. directly.
+- A brute-force sweep of quadratics a+bx+cx^2=0 (|coeffs|<=15, c in 2..11)
+  found identify already recognizes ~88%; the ~12% it misses are either
+  rationals the rational tier declines on purpose, or exotic large-coefficient
+  surds like (7+sqrt(37))/2. The nine-package corpus study found zero such
+  constants in real code.
+- Cost is real: a third per-literal PSLQ call on every 12+ digit literal, on
+  top of the additive and log-space tiers (scan time already doubled at
+  step 18).
+- Safety was not the blocker (0/3000 random numbers pass a quadratic +
+  confidence gate); marginal value was. Adding a tier whose unique coverage
+  is constants nobody writes, at a real scan-time cost, is negative value.
+Reconsider only if a concrete real-world miss of a quadratic surd turns up.
+
+**Original plan (for reference):**
 **Goal:** Recognize numbers like tan(pi/8) = sqrt(2)-1 when not in the table, as
 roots of small quadratics.
 **Files:** src/exact_linter/recognize.py, confidence.py, tests/test_recognize.py
