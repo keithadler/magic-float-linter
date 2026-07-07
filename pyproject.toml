@@ -4,7 +4,7 @@ build-backend = "hatchling.build"
 
 [project]
 name = "exact-linter"
-version = "0.1.0"
+version = "0.2.0"
 description = "Finds magic float constants in Python code (pi/180, 1/ln 2, 2/3, ...) and suggests exact, readable replacements."
 readme = "README.md"
 license = { text = "MIT" }

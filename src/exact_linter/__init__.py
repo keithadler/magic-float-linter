@@ -9,7 +9,7 @@ from .extract import FloatLiteral, extract_file, extract_source
 from .recognize import Match, recognize
 from .report import Finding
 
-__version__ = "0.1.0"
+__version__ = "0.2.0"
 
 __all__ = [
     "FloatLiteral",
