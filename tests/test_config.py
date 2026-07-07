@@ -81,6 +81,24 @@ def test_config_exclude_tests(tmp_path, capsys):
     assert main([str(tmp_path)]) == 0
 
 
+def test_config_select(tmp_path, capsys):
+    (tmp_path / "p.py").write_text("FULL = 3.141592653589793\n")
+    (tmp_path / "pyproject.toml").write_text('[tool.exact]\nselect = ["truncated"]\n')
+    assert main([str(tmp_path)]) == 0  # recognized (not truncated) -> filtered by select
+
+
+def test_config_ignore(tmp_path, capsys):
+    (tmp_path / "p.py").write_text("SHORT = 3.14159\n")
+    (tmp_path / "pyproject.toml").write_text('[tool.exact]\nignore = ["truncated"]\n')
+    assert main([str(tmp_path)]) == 0
+
+
+def test_cli_select_beats_config(tmp_path, capsys):
+    (tmp_path / "p.py").write_text("FULL = 3.141592653589793\n")
+    (tmp_path / "pyproject.toml").write_text('[tool.exact]\nselect = ["truncated"]\n')
+    assert main([str(tmp_path), "--select", "recognized"]) == 1
+
+
 def test_config_bad_toml_is_ignored(tmp_path):
     (tmp_path / "pyproject.toml").write_text("this is [not toml")
     config = load_config(tmp_path)

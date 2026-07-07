@@ -10,7 +10,10 @@ from pathlib import Path
 _NUMERIC = (int, float)
 _CONTAINERS = (ast.List, ast.Tuple, ast.Set, ast.Dict)
 _NESTED_SEQUENCE_SIZE = 1_000_000  # sentinel: always over the data-sequence threshold
-_SUPPRESS_RE = re.compile(r"#\s*exact:\s*ignore\b")
+# "# exact: ignore" suppresses every finding code on the line; an optional
+# bracketed list ("# exact: ignore[truncated,near-miss]") narrows that to
+# specific codes only - see recognize.Match.code for the vocabulary.
+_SUPPRESS_RE = re.compile(r"#\s*exact:\s*ignore\b(?:\[([a-z][a-z,\s-]*)\])?")
 
 
 @dataclass
@@ -52,6 +55,10 @@ class FloatLiteral:
     context: str = ""  # nearest name binding (variable, keyword, default arg), if any
     sequence_size: int = field(default=0)  # numeric elements in the enclosing list/tuple/set
     suppressed: bool = False  # silenced by a "# exact: ignore" comment
+    # None = suppress every finding code (bare "# exact: ignore"); a
+    # non-None frozenset = suppress only these specific codes
+    # ("# exact: ignore[truncated]"). Meaningless when suppressed is False.
+    suppressed_codes: frozenset[str] | None = None
     op: str = ""  # enclosing binary operation: "mul", "div-num", "div-den", "add", "sub"
     other_operand: str = ""  # source text of the other operand, when it is a simple name
 
@@ -198,14 +205,28 @@ def _extract_sequences(
     return sequences
 
 
-def _is_suppressed(lineno: int, lines: list[str]) -> bool:
-    """A literal is suppressed by a trailing comment on its own line, or by a
-    comment-only line directly above it."""
+def _parse_suppress_codes(match: re.Match) -> frozenset[str] | None:
+    raw = match.group(1)
+    if raw is None:
+        return None  # bare "ignore": suppress every code
+    codes = frozenset(c.strip() for c in raw.split(",") if c.strip())
+    return codes or None  # "ignore[]" or "ignore[ , ]": treat like bare ignore
+
+
+def _suppression_for_line(lineno: int, lines: list[str]) -> tuple[bool, frozenset[str] | None]:
+    """(is_suppressed, codes) for a literal on this line: suppressed by a
+    trailing comment on its own line, or by a comment-only line directly
+    above it. `codes` is None when every finding code is suppressed."""
     own_line = lines[lineno - 1] if 0 < lineno <= len(lines) else ""
-    if _SUPPRESS_RE.search(own_line):
-        return True
+    m = _SUPPRESS_RE.search(own_line)
+    if m:
+        return True, _parse_suppress_codes(m)
     prev_line = lines[lineno - 2].strip() if lineno >= 2 else ""
-    return prev_line.startswith("#") and bool(_SUPPRESS_RE.search(prev_line))
+    if prev_line.startswith("#"):
+        m = _SUPPRESS_RE.search(prev_line)
+        if m:
+            return True, _parse_suppress_codes(m)
+    return False, None
 
 
 def extract_source(source: str, file: Path) -> list[FloatLiteral]:
@@ -223,6 +244,7 @@ def extract_source(source: str, file: Path) -> list[FloatLiteral]:
         if isinstance(node, ast.Constant) and type(node.value) is float:
             text = ast.get_source_segment(source, node) or repr(node.value)
             op, other_operand = _operation(node, parents, source)
+            suppressed, suppressed_codes = _suppression_for_line(node.lineno, lines)
             literals.append(
                 FloatLiteral(
                     text=text.strip("()"),
@@ -231,7 +253,8 @@ def extract_source(source: str, file: Path) -> list[FloatLiteral]:
                     col=node.col_offset,
                     context=_context_for(node, parents),
                     sequence_size=_sequence_size(node, parents),
-                    suppressed=_is_suppressed(node.lineno, lines),
+                    suppressed=suppressed,
+                    suppressed_codes=suppressed_codes,
                     op=op,
                     other_operand=other_operand,
                 )

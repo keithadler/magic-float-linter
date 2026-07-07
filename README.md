@@ -127,6 +127,23 @@ plus the size of the space searched to find it. A 16-digit match on `pi/180` is
 near-certain; a 6-digit match on some elaborate combination is a coincidence and is
 suppressed. Tune the gate with `--min-surplus` (default 2.0, higher = stricter).
 
+## Selecting which findings to report
+
+Every finding has a stable **code** - `recognized`, `truncated`, `near-miss`, or
+`sequence` - and `--select`/`--ignore` filter on it directly, the same
+select/ignore model ruff and flake8 use:
+
+```
+$ exact --select truncated,near-miss mycode/     # only the two precision-bug codes
+$ exact --ignore near-miss mycode/                # everything except near-misses
+```
+
+`--select` restricts to exactly those codes; `--ignore` removes codes from
+whatever's currently allowed (everything, by default). `--truncation-only` and
+`--near-miss-only` still work - they're sugar for `--select truncated` and
+`--select near-miss` - but `--select` wins if both are given. Configure
+persistently via `[tool.exact]` (see Configuration below).
+
 ## Whole-sequence recognition
 
 A single literal inside a data table (`>3` numeric elements) is deliberately
@@ -254,10 +271,13 @@ Takes `--min-surplus` and `--json` like the main scan.
 ## Suppressing a finding
 
 Add a `# exact: ignore` comment on the literal's line (or on its own line directly
-above) to silence it:
+above) to silence it. A bracketed code list narrows that to specific codes only,
+using the same vocabulary as `--select`/`--ignore`:
 
 ```python
-TOLERANCE = 3.14159  # exact: ignore
+TOLERANCE = 3.14159             # exact: ignore                  (silences everything)
+TOLERANCE = 3.14159             # exact: ignore[truncated]        (only the truncation finding)
+EULER = 2.71827                 # exact: ignore[near-miss]        (only the typo finding)
 ```
 
 ## Install
@@ -278,6 +298,9 @@ exact [paths ...]        scan files or directories (default: .)
   --json                 shortcut for --format json
   --truncation-only      report only constants that also lose precision
   --near-miss-only       report only likely typos (see below)
+  --select CODES         report only these codes (comma-separated: recognized,
+                         truncated, near-miss, sequence)
+  --ignore CODES         never report these codes (comma-separated)
   --exclude-tests        skip test_*.py, *_test.py, and test(s)/ directories
   --min-surplus N        evidence threshold (default 2.0)
   --jobs N, -j N         scan files in N parallel processes (default 1)
@@ -351,6 +374,9 @@ min_surplus = 2.0        # evidence threshold (higher = stricter)
 min_digits = 6           # ignore literals with fewer significant digits
 exclude = ["generated/*", "vendored/*"]   # fnmatch globs
 truncation_only = false
+near_miss_only = false
+select = []               # e.g. ["truncated", "near-miss"] - restrict to just these
+ignore = []                # e.g. ["near-miss"] - never report these
 exclude_tests = false
 
 # project-specific constants join the recognition table (and get

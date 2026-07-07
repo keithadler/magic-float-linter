@@ -33,11 +33,18 @@ class ElementExplanation:
     match: Match | None  # None if trivially self-explanatory (an int, 0, a short/round value)
 
 
+CODE = "sequence"  # stable finding category for --select/--ignore; see recognize.Match.code
+
+
 @dataclass(frozen=True)
 class SequenceMatch:
     name: str  # e.g. "classic RK4 weights", or "exact rational/constant sequence"
     suggestion: str  # a Python list literal to replace the whole sequence
     elements: tuple[ElementExplanation, ...]
+
+    @property
+    def code(self) -> str:
+        return CODE
 
 
 def _is_trivially_exact(text: str) -> bool:
