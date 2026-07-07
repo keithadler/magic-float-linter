@@ -143,9 +143,13 @@ rk4.py:2:15  [0.16666666666666666, 0.3333333333333333, 0.3333333333333333, 0.166
 1 exact sequence found (informational - not counted toward pass/fail):
 ```
 
-A small library of iconic sequences from numerical methods (RK4 weights and
-nodes, Simpson's 3/8 rule, reciprocal factorials) gets a real name; anything
-else that's fully explained falls back to a generic label. The bar is strict:
+A small library of iconic sequences from numerical methods (RK4 weights,
+Simpson's 3/8 rule, reciprocal factorials) gets a real name; anything
+else that's fully explained falls back to a generic label. Named entries are
+deliberately picky about being *distinctive*, not just correct - `[0, 0.5,
+0.5, 1]` looks like RK4's nodes but is common enough that it turned out to
+be an FIR filter's frequency band edges in real code, so that entry was
+removed rather than shipped with a misleading name. The bar is strict:
 **one** unexplained element sinks the whole sequence, so this never fires on
 real data tables that merely contain a few round-looking numbers by chance.
 

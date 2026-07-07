@@ -99,14 +99,20 @@ def _agrees_with_fraction(text: str, target: Fraction) -> bool:
 # deliberately omitted for exactly that reason (caught while testing, not
 # guessed at - the same "don't ship an unreachable entry" discipline used
 # when evaluating and skipping the quadratic minimal-polynomial tier).
+#
+# Every entry must also be *distinctive*, not just correct: "classic RK4
+# nodes" (0, 1/2, 1/2, 1) was here and got removed after the real-world
+# corpus scan found it firing on scipy's test_fir_filter_design.py, where
+# [0.0, 0.5, 0.5, 1.0] is a normalized frequency band-edge array for an
+# FIR filter - nothing to do with Runge-Kutta. The values were correct;
+# the *name* was misleading, because a four-point 0/half/half/1 pattern is
+# too generic to reliably indicate any one algorithm. RK4 weights
+# (1/6, 1/3, 1/3, 1/6) is a much less common pattern and produced zero
+# false attributions anywhere in the corpus - kept for that reason.
 _NAMED_SEQUENCES: tuple[tuple[str, tuple[Fraction, ...]], ...] = (
     (
         "classic Runge-Kutta (RK4) weights",
         (Fraction(1, 6), Fraction(1, 3), Fraction(1, 3), Fraction(1, 6)),
-    ),
-    (
-        "classic Runge-Kutta (RK4) nodes",
-        (Fraction(0), Fraction(1, 2), Fraction(1, 2), Fraction(1)),
     ),
     (
         "Simpson's 3/8 rule weights",

@@ -28,11 +28,17 @@ def test_rk4_weights_recognized():
     assert m.suggestion == "[1 / 6, 1 / 3, 1 / 3, 1 / 6]"
 
 
-def test_rk4_nodes_recognized_even_though_every_element_is_trivial():
+def test_generic_zero_half_half_one_not_named_rk4():
+    # regression test: found via the real scipy corpus scan.
+    # [0.0, 0.5, 0.5, 1.0] is scipy's normalized frequency band-edge array
+    # for an FIR filter (test_fir_filter_design.py) - nothing to do with
+    # Runge-Kutta. "classic RK4 nodes" was removed from the named-sequence
+    # library because a four-point 0/half/half/1 pattern is too generic to
+    # reliably attribute to any one algorithm - every element being trivial
+    # (nothing genuinely revealed) and no reliable name applying means this
+    # must not be reported at all, not mislabeled.
     seq = _seq("0.0", "0.5", "0.5", "1.0")
-    m = identify_sequence(seq, min_surplus=2.0)
-    assert m is not None
-    assert m.name == "classic Runge-Kutta (RK4) nodes"
+    assert identify_sequence(seq, min_surplus=2.0) is None
 
 
 def test_simpson_38_recognized():
