@@ -13,9 +13,11 @@ from fnmatch import fnmatch
 from functools import partial
 from pathlib import Path
 
+from .baseline import finding_key, load_baseline, write_baseline
 from .confidence import DEFAULT_MIN_SURPLUS
 from .config import load_config
 from .extract import extract_file_info
+from .gitutil import changed_lines, line_is_changed
 from .idioms import idiomatic
 from .recognize import recognize
 from .report import Finding, adjust_for_imports, render_github, render_json, render_text
@@ -275,6 +277,30 @@ def main(argv: Sequence[str] | None = None) -> int:
         help="with --fix/--fix-truncated, print a unified diff instead of writing files",
     )
     parser.add_argument(
+        "--changed-only",
+        action="store_true",
+        help=(
+            "only report findings on lines changed since --since (default: HEAD,"
+            " i.e. uncommitted changes); requires a git repository"
+        ),
+    )
+    parser.add_argument(
+        "--since",
+        default=None,
+        help="git ref to diff against for --changed-only (default: HEAD)",
+    )
+    parser.add_argument(
+        "--baseline",
+        type=Path,
+        default=None,
+        help="path to a baseline file; only findings not already in it are reported",
+    )
+    parser.add_argument(
+        "--update-baseline",
+        action="store_true",
+        help="write current findings to --baseline instead of reporting them",
+    )
+    parser.add_argument(
         "--exit-zero", action="store_true", help="exit 0 even when findings are reported"
     )
     parser.add_argument(
@@ -288,6 +314,12 @@ def main(argv: Sequence[str] | None = None) -> int:
         "-v", "--verbose", action="store_true", help="show counts of skipped literals"
     )
     args = parser.parse_args(argv)
+    if args.update_baseline and args.baseline is None:
+        print("error: --update-baseline requires --baseline PATH", file=sys.stderr)
+        return 2
+    if args.since and not args.changed_only:
+        print("error: --since only applies with --changed-only", file=sys.stderr)
+        return 2
 
     # CLI flags override [tool.exact] in pyproject.toml; config overrides defaults
     config = load_config(Path(args.paths[0]))
@@ -340,6 +372,46 @@ def main(argv: Sequence[str] | None = None) -> int:
 
     findings.sort(key=lambda f: (str(f.literal.file), f.literal.line, f.literal.col))
 
+    # the directory --changed-only and --baseline resolve paths relative to:
+    # the scanned path, not the process's cwd, which differ whenever exact is
+    # invoked with an explicit path (or, in tests, when the test process's cwd
+    # is this repo but the scan target is an unrelated tmp_path)
+    scan_root = Path(args.paths[0])
+    scan_root = scan_root if scan_root.is_dir() else scan_root.parent
+
+    excluded_unchanged = 0
+    if args.changed_only:
+        changed = changed_lines(args.since, scan_root)
+        if changed is None:
+            print(
+                "error: --changed-only requires a git repository (git not found,"
+                " or not run inside one)",
+                file=sys.stderr,
+            )
+            return 2
+        kept = []
+        for finding in findings:
+            if line_is_changed(changed, finding.literal.file, finding.literal.line):
+                kept.append(finding)
+            else:
+                excluded_unchanged += 1
+        findings = kept
+
+    excluded_baselined = 0
+    if args.update_baseline:
+        written = write_baseline(args.baseline, findings, scan_root)
+        print(f"baseline written to {args.baseline}: {written} entries.")
+        return 0
+    if args.baseline is not None:
+        known = load_baseline(args.baseline)
+        kept = []
+        for finding in findings:
+            if finding_key(finding, scan_root) in known:
+                excluded_baselined += 1
+            else:
+                kept.append(finding)
+        findings = kept
+
     if args.fix or args.fix_truncated:
         return _run_fixes(findings, fix_truncated=args.fix_truncated, diff=args.diff)
 
@@ -360,6 +432,10 @@ def main(argv: Sequence[str] | None = None) -> int:
             print(f"\n{excluded_test_files} test file(s) excluded (--exclude-tests).")
         if args.verbose and excluded_by_pattern:
             print(f"{excluded_by_pattern} file(s) excluded by [tool.exact] exclude patterns.")
+        if args.verbose and excluded_unchanged:
+            print(f"{excluded_unchanged} finding(s) outside changed lines (--changed-only).")
+        if args.verbose and excluded_baselined:
+            print(f"{excluded_baselined} finding(s) already in the baseline.")
     return 1 if findings and not args.exit_zero else 0
 
 

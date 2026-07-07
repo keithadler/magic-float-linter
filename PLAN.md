@@ -138,6 +138,45 @@ their plain, non-historical form; full stdlib scan unchanged at 54
 findings (order-of-match fix caused zero regressions there). 147 tests,
 ruff + self-lint clean.
 
+### Git-aware incremental mode: --changed-only and --baseline [DONE 2026-07-07]
+**Goal:** the adoption unlock for legacy codebases - nobody enables a linter
+that fires hundreds of times on day one. Two independent, composable
+mechanisms.
+**Files:** new gitutil.py (`changed_lines`, `line_is_changed`), new
+baseline.py (`load_baseline`, `write_baseline`, `finding_key`), cli.py
+(--changed-only, --since, --baseline, --update-baseline), tests/
+test_gitutil.py, test_baseline.py, test_changed_only.py.
+**--changed-only:** maps file -> set of added/changed line numbers by
+parsing `git diff --unified=0` (context-free, so every non-hunk-header line
+is unambiguously a '+' or '-' line), defaulting to a diff against HEAD (not
+a bare `git diff`, which only shows unstaged changes vs the index and would
+miss anything already `git add`-ed). Untracked new files count as entirely
+changed (via `git ls-files --others --exclude-standard`). `--since REF`
+diffs against an arbitrary ref instead, for CI PR checks
+(`--since origin/main`). Not being in a git repository is a hard error
+(exit 2), not a silent fall-through to scanning everything.
+**--baseline:** findings are keyed by (file, literal text, recognized form)
+- deliberately not by line number, which drifts with unrelated edits and
+would re-flag frozen debt for no reason. `--update-baseline` snapshots
+whatever the current invocation would have reported (composable with other
+filters) to a JSON file; a later plain `--baseline PATH` run reports only
+findings not already in it.
+**Real bug found and fixed while testing this:** both features first used
+`Path.cwd()` (the process's working directory) as the anchor for git
+resolution and baseline-relative paths. That silently breaks whenever exact
+is invoked with an explicit path different from the shell's cwd - the test
+suite caught this immediately (tests run pytest from the repo root but scan
+an unrelated tmp_path; changed_lines was diffing the *repo*, not the
+scanned tmp_path, so real findings were incorrectly filtered out as "not
+changed"). Fixed by anchoring both features to `args.paths[0]` instead,
+matching the precedent already set by `load_config` in the same function.
+**Validated:** 19 new tests using real temporary git repos (uncommitted,
+staged, untracked, and cross-branch `--since` cases; baseline write/filter/
+line-drift-survival/missing-file cases); a manual end-to-end smoke test on
+this repo itself (planted a real magic float in an uncommitted change,
+confirmed `--changed-only` caught exactly that line and nothing else, then
+reverted cleanly). 166 tests, ruff + self-lint clean.
+
 ## Ground rules for every step
 
 1. Run `.venv/bin/python -m pytest -q` and `.venv/bin/ruff check .` before every

@@ -172,6 +172,36 @@ Add `--diff` to preview either as a unified diff without writing. Every edit is
 located from the re-parsed AST and verified against the source before it is
 applied; anything that does not verify is skipped, never guessed at.
 
+## Adopting on a legacy codebase
+
+Two flags exist specifically so a large existing codebase can turn `exact` on
+without a big one-time cleanup:
+
+**`--changed-only`** reports findings only on lines that are new or changed,
+via git - the natural fit for a CI check on a pull request:
+
+```
+$ exact . --changed-only                 # uncommitted changes (staged + unstaged)
+$ exact . --changed-only --since origin/main   # everything changed since a branch point
+```
+
+New (untracked) files are scanned in full. Requires being run inside a git
+repository.
+
+**`--baseline`** snapshots today's findings and only reports new ones from
+then on:
+
+```
+$ exact . --baseline .exact-baseline.json --update-baseline   # freeze current debt
+$ exact . --baseline .exact-baseline.json                     # CI: fail only on new findings
+```
+
+A baselined finding is matched by file, literal text, and recognized form -
+deliberately not by line number, so unrelated edits elsewhere in the file
+don't un-baseline it. Run `exact` from the same directory both times (the
+path argument, not the shell's cwd, is what baseline entries are stored
+relative to).
+
 ## Identifying a single number
 
 `exact identify <number>` explains one value directly - the Inverse Symbolic
@@ -219,6 +249,10 @@ exact [paths ...]        scan files or directories (default: .)
   --exclude-tests        skip test_*.py, *_test.py, and test(s)/ directories
   --min-surplus N        evidence threshold (default 2.0)
   --jobs N, -j N         scan files in N parallel processes (default 1)
+  --changed-only         only report findings on lines changed since --since
+  --since REF            git ref to diff against for --changed-only (default: HEAD)
+  --baseline PATH        only report findings not already in this baseline file
+  --update-baseline      write current findings to --baseline instead of reporting
   --fix                  rewrite literals whose exact form is bit-identical
   --fix-truncated        also rewrite truncated table constants (changes values)
   --diff                 with --fix, print a unified diff instead of writing
