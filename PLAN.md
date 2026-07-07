@@ -688,6 +688,22 @@ a numpy Chebyshev-extrema array (`[-1, -sqrt(2)/2, 0, sqrt(2)/2, 1]`) and
 sympy test files with truncated pi-multiple arrays
 (`[3.141592, 6.283185, 9.424777, 12.566370]` -> `[math.pi, math.tau, 3*math.pi, 4*math.pi]`).
 
+**A third real issue, found scanning the last two (larger) packages:**
+scipy and statsmodels together produced 44 more sequence findings, all
+numerically correct - except one *naming* problem. "classic RK4 nodes"
+(0, 1/2, 1/2, 1) fired six times in `test_fir_filter_design.py`, where
+`[0.0, 0.5, 0.5, 1.0]` is a normalized frequency band-edge array for an FIR
+filter, nothing to do with Runge-Kutta. The values were correct; the *name*
+was misleading, because a four-point 0/half/half/1 pattern is too generic to
+reliably indicate any one algorithm - unlike RK4 weights
+(1/6, 1/3, 1/3, 1/6), a much less common pattern that produced zero false
+attributions anywhere across all nine packages. Removed "RK4 nodes" from the
+named-sequence library rather than downgrade its wording; an all-trivial
+sequence with no reliable name now correctly reports nothing at all, which
+is silence, not a wrong claim. Same discipline as the other two fixes: a
+real corpus run surfaced something the unit tests couldn't have, because the
+unit tests were written by the same reasoning that introduced the entry.
+
 ---
 
 ## Step ordering notes for the executor
