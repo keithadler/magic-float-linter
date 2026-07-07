@@ -116,6 +116,16 @@ all grew substantially; this is effectively the tool's first "real" release.
   packages scanned for real, with three verified upstream precision bugs
   found (sympy, scikit-image, statsmodels) and the false-positive taxonomy
   from everything that looked like a bug but wasn't.
+- [An AI/ML corpus study](docs/ai-ml-corpus-study.md): torch, transformers,
+  jax, xgboost, keras, onnx and more. Two further verified truncations found
+  (Hugging Face Transformers' `1/ln(2)` in the TimesFM/VideoPrism attention
+  math, ONNX's reference-classifier `sqrt(2)`), both documented with an honest,
+  low-impact assessment rather than overstated.
+- The false-positive audit was extended to cryptography libraries (a direct,
+  empirical answer to "could a truncated constant be a backdoor?" - no
+  float-constant surface exists there) and the most-downloaded PyPI packages;
+  ~40 packages total, with no false alarms on non-numerical code.
+- CONTRIBUTING.md, SECURITY.md, and issue/PR templates for the repository.
 
 ## 0.1.0 (2026-07-06)
 
