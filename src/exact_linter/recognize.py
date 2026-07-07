@@ -107,9 +107,39 @@ def _match_table(x: mpmath.mpf, digits: int) -> Match | None:
                     tier="table",
                     matched_digits=digits,
                     surplus=confidence.table_surplus(digits, len(rows))
-                    - confidence.RECIPROCAL_PENALTY,
+                    - confidence.FOLD_PENALTY,
                     precision_lost=_precision_lost(x, true_value),
                 )
+    # Complement folding (1 - entry, e.g. exponential-saturation constants
+    # like 1 - 1/e) and shift folding (entry + 1, e.g. a root shifted up by
+    # one), restricted to entries in a sane range so this doesn't produce
+    # nonsense like "1 - Avogadro's number".
+    for value, entry in rows:
+        if not (0 < value < 2):
+            continue
+        sugg = f"({entry.suggestion})" if _needs_parens(entry.suggestion) else entry.suggestion
+        if _agrees(1 - x, value, digits):
+            true_value = 1 - value
+            return Match(
+                form=f"1-({entry.form})",
+                suggestion=f"1 - {sugg}",
+                note=entry.note,
+                tier="table",
+                matched_digits=digits,
+                surplus=confidence.table_surplus(digits, len(rows)) - confidence.FOLD_PENALTY,
+                precision_lost=_precision_lost(x, true_value),
+            )
+        if _agrees(x + 1, value, digits):
+            true_value = value - 1
+            return Match(
+                form=f"({entry.form})-1",
+                suggestion=f"{sugg} - 1",
+                note=entry.note,
+                tier="table",
+                matched_digits=digits,
+                surplus=confidence.table_surplus(digits, len(rows)) - confidence.FOLD_PENALTY,
+                precision_lost=_precision_lost(x, true_value),
+            )
     return None
 
 
