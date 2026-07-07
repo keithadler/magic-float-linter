@@ -150,6 +150,9 @@ actually provides must comfortably exceed the complexity of the claimed expressi
 plus the size of the space searched to find it. A 16-digit match on `pi/180` is
 near-certain; a 6-digit match on some elaborate combination is a coincidence and is
 suppressed. Tune the gate with `--min-surplus` (default 2.0, higher = stricter).
+This isn't just argued - see [the calibration check](docs/confidence-calibration.md):
+42,000 random literals, and the empirical false-positive rate came in below the
+formula's own prediction at every threshold tested.
 
 ## Selecting which findings to report
 
@@ -391,6 +394,12 @@ are numeric or scientific libraries, so almost nothing should fire. Five of the
 six produced zero findings. The one hit, in Django's GIS module, is a correct
 recognition of an exact conversion factor Django itself gets right (not a bug) -
 see [the false-positive audit](docs/false-positive-audit.md) for the full writeup.
+
+Underneath both of those sits the confidence-surplus formula itself, checked
+directly rather than just through its effects: [42,000 random literals](docs/confidence-calibration.md),
+and the empirical false-positive rate came in below the formula's own prediction
+at every threshold tested - including a close, honest look at every hit that
+landed anywhere near the default gate.
 
 ## Roadmap
 

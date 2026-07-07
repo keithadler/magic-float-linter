@@ -863,6 +863,36 @@ application code; doesn't replace the separate Monte Carlo check above for
 general calibration, and six packages isn't exhaustive - a natural thing to
 repeat periodically as the table and tiers grow.
 
+### Confidence-surplus calibration [DONE 2026-07-07]
+**Goal:** item #4 from the "accurate and useful" review - every other
+validation in this project tests the confidence formula indirectly, by
+checking the tool's behavior on specific inputs. This is the first check of
+the formula itself: does the claimed rate ("surplus S means roughly a
+`10**-S` chance of coincidence") actually hold, systematically, across the
+full range of surplus values the tool can produce - not just "is it zero at
+one spot-checked point," which is what every prior tier-specific validation
+(log-space widening, quadratic-tier evaluation, rational near-miss) did.
+**Files:** new scripts/calibration_sweep.py (reproducible, `--quick` mode
+for a fast sanity check), new docs/confidence-calibration.md.
+**Method:** genuinely random d-significant-digit literals (d = 6 to 16,
+trial counts scaled down as PSLQ cost grows - a 16-digit call is ~40x a
+6-digit one), run through the real `recognize()` pipeline with the gate
+disabled (`min_surplus=-100`) so even weak matches are visible. 42,000
+trials, ~5 minutes. Every hit is a coincidence by construction, since the
+input is pure noise.
+**Result:** at every threshold tested (surplus >= 0 through 10), the
+empirical false-positive rate came in *below* the theoretical `10**-S`
+prediction - at the default gate (surplus >= 2), by a ~38x margin (0.026%
+observed vs. a 1% theoretical bound). The formula is conservative, not
+leaky. The ten hits that landed near the default gate were read individually
+rather than trusted at the aggregate level: 8 of 10 were folded matches
+(reciprocal/complement/shift) clustered at low digit counts, and their
+observed rate (~0.05% across 16,000 trials at digits 6-7) matches the
+theoretical prediction for their surplus (~0.063%) closely - exactly what
+good calibration looks like at that surplus level, not evidence of a leak.
+**No formula change was needed** - a genuinely clean result, recorded as
+such rather than as a lead-in to a fix.
+
 ---
 
 ## Step ordering notes for the executor

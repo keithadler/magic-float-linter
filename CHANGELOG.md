@@ -79,6 +79,12 @@ all grew substantially; this is effectively the tool's first "real" release.
   full. Five produced zero findings; the one hit (Django's GIS module) is a
   correct recognition of an exact conversion factor, not a bug. See
   `docs/false-positive-audit.md`.
+- **Confidence-surplus calibration**: a 42,000-trial Monte Carlo check of the
+  confidence formula itself, not just its effects. Empirical false-positive
+  rate came in below the formula's own `10**-surplus` prediction at every
+  threshold tested. See `docs/confidence-calibration.md` and
+  `scripts/calibration_sweep.py` (reproducible, `--quick` mode for a fast
+  sanity check).
 
 ### Fixed
 
