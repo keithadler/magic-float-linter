@@ -771,6 +771,23 @@ stdlib re-scan: identical 54 findings (29 truncated, 4 near-miss) to the
 pre-refactor baseline - zero behavior change for anyone not using the new
 flags. 233 tests, ruff + self-lint clean.
 
+### Windows/macOS in CI [DONE 2026-07-07]
+**Goal:** item #5 from the "make it more feature complete" review - CI only
+ever ran ubuntu-latest, so nothing had verified this actually works on
+Windows, despite real platform-sensitive code existing (CRLF preservation
+in fix.py, path exclusion matching, `ProcessPoolExecutor` using spawn on
+Windows vs. fork on Linux/macOS - genuinely different worker-startup
+semantics, not just a syntax difference).
+**Files:** .github/workflows/ci.yml.
+**How:** kept the full Python 3.10-3.14 matrix on ubuntu-latest (cheapest);
+added one representative version (3.13) each on windows-latest and
+macos-latest via a matrix `include`, rather than the full 3x5 cross product.
+**Result:** all 7 jobs passed on the first real run, including Windows -
+genuinely verified, not just reasoned about from reading the code. No bugs
+found this time, unlike every other "run it for real" pass this session -
+worth recording as a clean result precisely because the pattern elsewhere
+has been "the real environment finds something the reasoning didn't."
+
 ---
 
 ## Step ordering notes for the executor
