@@ -371,7 +371,7 @@ suffixed literal `3.14159f` recognized as truncated pi.
 
 ## Phase H - the showpiece (step 25)
 
-### Step 25: corpus study
+### Step 25: corpus study [DONE 2026-07-07]
 **Goal:** The writeup artifact: "how much magic-float debt is in popular Python
 code" - also the definitive false-positive audit.
 **Files:** new scripts/corpus_study.py, new docs/corpus-study.md
@@ -386,6 +386,19 @@ section (review EVERY finding flagged truncated; sample 30 of the rest).
 **Accept:** docs/corpus-study.md committed with real numbers and the manual
 review notes. Any false positive found becomes a regression test and, if
 fixable, a scoring fix in the same commit series.
+**Note:** executed early (out of order) because the tool was ready and the
+study kept paying for itself. Nine scientific packages instead of 50 web/misc
+ones - the tool's audience is numeric code, and requests/django would have
+contributed near-zero candidates (Pillow already scanned as 0 findings from
+117 literals). scripts/corpus_study.py scans importable packages in the
+current environment rather than pip-downloading sdists (simpler, same
+result). The study found two real bugs in exact itself (scan-root exclusion,
+nested-container triage - both fixed with regression tests mid-study), three
+genuine upstream bugs (sympy AutoLev deg/rad, skimage Lab 6/29, statsmodels
+tricube 70/81), and one documented miss that motivated shipping step 18
+early. Manual review was 100% of non-test truncated findings rather than
+"every truncated + sample 30" - test-file findings are planted constants by
+definition and were spot-checked instead.
 
 ---
 
