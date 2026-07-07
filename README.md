@@ -416,6 +416,24 @@ repos:
         # or: id: exact-truncation, to only flag precision-losing literals
 ```
 
+## flake8
+
+`exact` registers itself as a flake8 plugin automatically on install (no config
+needed) - it rides inside a pipeline you're already running, prefixed `EXA`:
+
+```
+$ flake8 --select=EXA mycode/
+mycode/orbit.py:42:11: EXA002 57.29577951308232 is 180/pi, accurate to only...
+```
+
+- `EXA001` recognized, `EXA002` truncated, `EXA003` near-miss (likely typo).
+- Uses the same `[tool.exact]` config, `--select`/`--ignore` composition, and
+  `# exact: ignore[code]` suppression as the standalone CLI - a literal treated
+  one way by `exact` is treated the same way by flake8.
+- Whole-sequence recognition is intentionally out of scope here: it can span
+  many elements across several lines, which doesn't fit flake8's
+  single-location diagnostic model. Use the standalone CLI for that.
+
 ## Development
 
 ```
