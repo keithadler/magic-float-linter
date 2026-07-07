@@ -98,6 +98,63 @@ def scan_file(
     return findings, dict(skipped)
 
 
+def _run_fixes(findings: list[Finding], fix_truncated: bool, diff: bool) -> int:
+    import difflib
+    from collections import defaultdict as _dd
+
+    from .fix import fix_source
+
+    by_file: dict[Path, list[Finding]] = _dd(list)
+    for finding in findings:
+        by_file[finding.literal.file].append(finding)
+
+    total_applied = total_skipped = 0
+    value_changes: list[tuple[Path, int, str, str]] = []
+    for file, file_findings in sorted(by_file.items(), key=lambda kv: str(kv[0])):
+        try:
+            # bytes, not read_text: preserve CRLF exactly (no newline translation)
+            source = file.read_bytes().decode("utf-8")
+        except (OSError, UnicodeDecodeError):
+            continue
+        result = fix_source(source, file_findings, fix_truncated=fix_truncated)
+        total_applied += result.applied
+        total_skipped += result.skipped
+        if result.applied == 0:
+            continue
+        if fix_truncated:
+            for line, old, new in result.changes:
+                if float(old) != _safe_eval(new):
+                    value_changes.append((file, line, old, new))
+        if diff:
+            sys.stdout.writelines(
+                difflib.unified_diff(
+                    source.splitlines(keepends=True),
+                    result.new_source.splitlines(keepends=True),
+                    fromfile=str(file),
+                    tofile=str(file),
+                )
+            )
+        else:
+            file.write_bytes(result.new_source.encode("utf-8"))
+
+    verb = "would fix" if diff else "fixed"
+    print(f"\n{total_applied} literal(s) {verb}, {total_skipped} left unchanged.")
+    if value_changes and not diff:
+        print("WARNING: --fix-truncated changed these values to their exact form:")
+        for file, line, old, new in value_changes:
+            print(f"  {file}:{line}  {old} -> {new}")
+    return 0
+
+
+def _safe_eval(expr: str) -> float:
+    import math
+
+    try:
+        return float(eval(expr, {"__builtins__": {}, "math": math}))
+    except Exception:
+        return float("nan")
+
+
 def main(argv: Sequence[str] | None = None) -> int:
     parser = argparse.ArgumentParser(
         prog="exact",
@@ -132,6 +189,21 @@ def main(argv: Sequence[str] | None = None) -> int:
         "--exclude-tests",
         action="store_true",
         help="skip test files (test_*.py, *_test.py, or anything under a test/tests directory)",
+    )
+    parser.add_argument(
+        "--fix",
+        action="store_true",
+        help="rewrite literals whose exact form is bit-identical (safe, no value change)",
+    )
+    parser.add_argument(
+        "--fix-truncated",
+        action="store_true",
+        help="also rewrite truncated table constants (CHANGES values to the exact form)",
+    )
+    parser.add_argument(
+        "--diff",
+        action="store_true",
+        help="with --fix/--fix-truncated, print a unified diff instead of writing files",
     )
     parser.add_argument(
         "--exit-zero", action="store_true", help="exit 0 even when findings are reported"
@@ -197,6 +269,10 @@ def main(argv: Sequence[str] | None = None) -> int:
             skipped.update(file_skipped)
 
     findings.sort(key=lambda f: (str(f.literal.file), f.literal.line, f.literal.col))
+
+    if args.fix or args.fix_truncated:
+        return _run_fixes(findings, fix_truncated=args.fix_truncated, diff=args.diff)
+
     output_format = "json" if args.json else args.format
     if output_format == "json":
         print(render_json(findings))
