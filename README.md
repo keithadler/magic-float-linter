@@ -89,7 +89,8 @@ pip install .
 
 ```
 exact [paths ...]        scan files or directories (default: .)
-  --json                 machine-readable output
+  --format {text,json,github}   output format (default: text)
+  --json                 shortcut for --format json
   --truncation-only      report only constants that also lose precision
   --min-surplus N        evidence threshold (default 2.0)
   --exit-zero            always exit 0, even with findings
@@ -97,6 +98,11 @@ exact [paths ...]        scan files or directories (default: .)
 ```
 
 Exit code is 1 when findings are reported (flake8 convention), so it can run in CI.
+
+`--format github` prints [GitHub Actions workflow commands](https://docs.github.com/en/actions/using-workflows/workflow-commands-for-github-actions),
+so findings appear as inline annotations on a PR's Files Changed tab with no
+code-scanning setup required. Truncated constants are `::warning`, others are
+`::notice`. This is what the project's own CI uses to self-lint `src/`.
 
 ## What it will not flag
 

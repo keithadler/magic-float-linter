@@ -240,7 +240,7 @@ schema dependency).
 **Accept:** Output loads as JSON with runs[0].tool.driver.rules and results
 populated; README documents the code-scanning upload-sarif snippet.
 
-### Step 17: GitHub annotations format
+### Step 17: GitHub annotations format [DONE 2026-07-06]
 **Goal:** Findings appear inline on PRs without code-scanning setup.
 **Files:** cli.py, report.py, tests/test_cli.py
 **How:** `--format github` prints workflow commands:

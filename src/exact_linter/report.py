@@ -55,6 +55,18 @@ def render_text(
     return "\n".join(lines)
 
 
+def render_github(findings: list[Finding]) -> str:
+    """Render as GitHub Actions workflow commands, so findings show up as
+    inline PR annotations without any code-scanning setup."""
+    lines = []
+    for finding in findings:
+        lit, match = finding.literal, finding.match
+        level = "warning" if match.truncated else "notice"
+        message = f"{lit.text} is {match.form}; suggest {match.suggestion}"
+        lines.append(f"::{level} file={lit.file},line={lit.line},col={lit.col + 1}::{message}")
+    return "\n".join(lines)
+
+
 def render_json(findings: list[Finding]) -> str:
     payload = []
     for finding in findings:
