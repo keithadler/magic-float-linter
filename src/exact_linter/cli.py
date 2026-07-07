@@ -59,6 +59,11 @@ def main(argv: Sequence[str] | None = None) -> int:
         help="evidence surplus required to report a match (default: %(default)s)",
     )
     parser.add_argument(
+        "--truncation-only",
+        action="store_true",
+        help="report only truncated constants (magic numbers that also lose precision)",
+    )
+    parser.add_argument(
         "--exit-zero", action="store_true", help="exit 0 even when findings are reported"
     )
     parser.add_argument(
@@ -75,10 +80,12 @@ def main(argv: Sequence[str] | None = None) -> int:
                 skipped[reason] += 1
                 continue
             match = recognize(literal.text, min_surplus=args.min_surplus)
-            if match is not None:
-                findings.append(Finding(literal, match))
-            else:
+            if match is None:
                 skipped["no confident match"] += 1
+            elif args.truncation_only and not match.truncated:
+                skipped["recognized but not truncated"] += 1
+            else:
+                findings.append(Finding(literal, match))
 
     findings.sort(key=lambda f: (str(f.literal.file), f.literal.line, f.literal.col))
     if args.json:

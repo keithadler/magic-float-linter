@@ -35,6 +35,29 @@ data-like values are ignored), then run through three recognition tiers:
    (via `mpmath.identify`) searches for combinations like `(3*pi)/4` that the table
    does not cover.
 
+The table tier also does **reciprocal folding**: a literal that is `1/entry` for any
+table entry is recognized even when only the plain form is listed, so every reciprocal
+is covered for free.
+
+## Truncation detection
+
+Recognizing a constant is only half the story. `exact` also measures how much accuracy a
+literal *loses* by being written as a short decimal. `3.14159` names pi but is accurate
+to only six digits inside a float that holds sixteen - the exact form would recover ten
+lost digits. These are flagged as **truncated**, and they are often real precision bugs:
+
+```
+$ exact --truncation-only mycode/
+mycode/geo.py:12:19  3.14159  (PI)  TRUNCATED
+    = pi
+    suggestion: math.pi
+    precision: accurate to only 6 digits; the exact form recovers ~10 lost digits
+```
+
+Because the metric is the *magnitude* of lost precision, it even distinguishes a mistyped
+constant from a merely short one: `2.71827` (a typo for e) scores worse than a correctly
+rounded `2.71828`. Use `--truncation-only` to hunt precision bugs specifically.
+
 Every candidate match is gated by an **evidence score**: the digits the literal
 actually provides must comfortably exceed the complexity of the claimed expression
 plus the size of the space searched to find it. A 16-digit match on `pi/180` is
@@ -56,6 +79,7 @@ pip install .
 ```
 exact [paths ...]        scan files or directories (default: .)
   --json                 machine-readable output
+  --truncation-only      report only constants that also lose precision
   --min-surplus N        evidence threshold (default 2.0)
   --exit-zero            always exit 0, even with findings
   -v, --verbose          show counts of skipped literals
@@ -73,11 +97,13 @@ Exit code is 1 when findings are reported (flake8 convention), so it can run in 
 
 ## Roadmap
 
-- **Truncation detector**: flag `3.14159` as "pi typed to 6 digits inside a double
-  that holds 16" - a real precision bug, invisible to other tools.
+- **Context-aware suggestions**: rewrite `x * 0.017453...` as `math.radians(x)` and
+  `math.log(x) / math.log(2)` as `math.log2(x)`, using the surrounding expression.
 - `--fix` mode with conservative, language-aware rewrites.
 - Multi-language extraction via tree-sitter (JS, C, C++, Java).
 - SARIF output for GitHub code scanning.
+- Configuration via `[tool.exact]` in `pyproject.toml` (custom constants, thresholds,
+  per-path ignores) and inline `# exact: ignore` suppression.
 
 ## Development
 

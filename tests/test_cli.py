@@ -34,3 +34,17 @@ def test_cli_json_output(tmp_path, capsys):
     assert data[0]["form"] == "1/ln(2)"
     assert data[0]["context"] == "K"
     assert data[0]["line"] == 1
+    assert data[0]["truncated"] is False
+    assert data[0]["precision_lost"] == 0
+
+
+def test_cli_truncation_only(tmp_path, capsys):
+    (tmp_path / "p.py").write_text(
+        "SHORT = 3.14159\nFULL = 3.141592653589793\n"
+    )
+    code = main([str(tmp_path), "--truncation-only"])
+    out = capsys.readouterr().out
+    assert code == 1
+    assert "SHORT" in out and "TRUNCATED" in out
+    assert "FULL" not in out  # full-precision pi is recognized but not truncated
+    assert "1 truncated" in out
