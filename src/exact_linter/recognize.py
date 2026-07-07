@@ -12,6 +12,7 @@ from __future__ import annotations
 import re
 from dataclasses import dataclass
 from fractions import Fraction
+from functools import lru_cache
 
 import mpmath
 
@@ -36,7 +37,7 @@ DOUBLE_DIGITS = 15.95
 TRUNCATION_MIN_LOST = 3  # report truncation once this many digits are lost
 
 
-@dataclass
+@dataclass(frozen=True)
 class Match:
     form: str  # exact form, e.g. "pi/180"
     suggestion: str  # replacement code, e.g. "math.pi / 180"
@@ -291,8 +292,15 @@ def _match_logspace(x: mpmath.mpf, digits: int) -> Match | None:
     )
 
 
+@lru_cache(maxsize=None)
 def recognize(text: str, min_surplus: float = confidence.DEFAULT_MIN_SURPLUS) -> Match | None:
-    """Try to recognize a float literal (given as source text) as an exact form."""
+    """Try to recognize a float literal (given as source text) as an exact form.
+
+    Results are cached by (text, min_surplus): the same literal text appears
+    many times across a real corpus (placeholder values, planted test
+    constants), and the PSLQ tiers are expensive. Callers must treat the
+    returned Match as immutable - it is shared between identical calls.
+    """
     digits = significant_digits(text)
     with mpmath.workdps(max(digits, 15) + 25):
         x = mpmath.mpf(text.replace("_", ""))
