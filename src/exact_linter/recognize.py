@@ -17,7 +17,7 @@ from functools import lru_cache
 import mpmath
 
 from . import confidence
-from .constants import table
+from .constants import ConstantEntry, table
 from .triage import significant_digits
 
 PSLQ_MIN_DIGITS = 10  # PSLQ combos need strong evidence; skip short literals
@@ -81,8 +81,10 @@ def _needs_parens(suggestion: str) -> bool:
     return re.search(r"\s[-+*/]|\*\*", suggestion) is not None
 
 
-def _match_table(x: mpmath.mpf, digits: int) -> Match | None:
-    rows = table()
+def _match_table(
+    x: mpmath.mpf, digits: int, extra: tuple[ConstantEntry, ...] = ()
+) -> Match | None:
+    rows = table(extra)
     for value, entry in rows:
         if _agrees(x, value, digits):
             return Match(
@@ -293,18 +295,25 @@ def _match_logspace(x: mpmath.mpf, digits: int) -> Match | None:
 
 
 @lru_cache(maxsize=None)
-def recognize(text: str, min_surplus: float = confidence.DEFAULT_MIN_SURPLUS) -> Match | None:
+def recognize(
+    text: str,
+    min_surplus: float = confidence.DEFAULT_MIN_SURPLUS,
+    extra_entries: tuple[ConstantEntry, ...] = (),
+) -> Match | None:
     """Try to recognize a float literal (given as source text) as an exact form.
 
-    Results are cached by (text, min_surplus): the same literal text appears
-    many times across a real corpus (placeholder values, planted test
-    constants), and the PSLQ tiers are expensive. Callers must treat the
+    Results are cached by (text, min_surplus, extra_entries): the same literal
+    text appears many times across a real corpus (placeholder values, planted
+    test constants), and the PSLQ tiers are expensive. Callers must treat the
     returned Match as immutable - it is shared between identical calls.
     """
     digits = significant_digits(text)
     with mpmath.workdps(max(digits, 15) + 25):
         x = mpmath.mpf(text.replace("_", ""))
-        for finder in (_match_table, _match_rational, _match_pslq, _match_logspace):
+        match = _match_table(x, digits, extra_entries)
+        if match is not None and match.surplus >= min_surplus:
+            return match
+        for finder in (_match_rational, _match_pslq, _match_logspace):
             match = finder(x, digits)
             if match is not None and match.surplus >= min_surplus:
                 return match

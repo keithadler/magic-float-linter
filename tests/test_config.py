@@ -97,3 +97,43 @@ def test_load_config_from_file_path(tmp_path):
 def test_config_path_object_source(tmp_path):
     (tmp_path / "pyproject.toml").write_text("[tool.exact]\nmin_surplus = 1.0\n")
     assert isinstance(load_config(tmp_path).source, Path)
+
+
+CUSTOM_CONSTANT = """\
+[tool.exact.constants]
+plastic = { value = "1.32471795724474602596", suggestion = "PLASTIC_NUMBER", note = "plastic ratio" }
+"""
+
+
+def test_config_parses_custom_constants(tmp_path):
+    (tmp_path / "pyproject.toml").write_text(CUSTOM_CONSTANT)
+    config = load_config(tmp_path)
+    assert len(config.constants) == 1
+    entry = config.constants[0]
+    assert entry.form == "plastic"
+    assert entry.suggestion == "PLASTIC_NUMBER"
+    assert entry.decimal == "1.32471795724474602596"
+
+
+def test_custom_constant_is_recognized(tmp_path, capsys):
+    (tmp_path / "pyproject.toml").write_text(CUSTOM_CONSTANT)
+    (tmp_path / "p.py").write_text("RHO = 1.3247179572447460\n")
+    code = main([str(tmp_path)])
+    out = capsys.readouterr().out
+    assert code == 1
+    assert "PLASTIC_NUMBER" in out
+    assert "plastic ratio" in out
+
+
+def test_custom_constant_not_recognized_without_config(tmp_path, capsys):
+    (tmp_path / "p.py").write_text("RHO = 1.3247179572447460\n")
+    assert main([str(tmp_path)]) == 0
+
+
+def test_custom_constant_truncation_detected(tmp_path, capsys):
+    (tmp_path / "pyproject.toml").write_text(CUSTOM_CONSTANT)
+    (tmp_path / "p.py").write_text("RHO = 1.3247180\n")  # 8 digits of the plastic number
+    main([str(tmp_path), "--exit-zero"])
+    out = capsys.readouterr().out
+    assert "PLASTIC_NUMBER" in out
+    assert "TRUNCATED" in out
