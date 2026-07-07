@@ -286,7 +286,7 @@ plus PSLQ_SEARCH_DIGITS.
 value NOT in the table, e.g. "1.3660254037844386" = (1+sqrt(3))/2). Junk still
 None.
 
-### Step 20: complement and negation folding
+### Step 20: complement and negation folding [DONE 2026-07-07]
 **Goal:** Recognize 1-entry and entry-1 patterns (probabilities, conjugates).
 **Files:** src/exact_linter/recognize.py, confidence.py, tests/test_folding.py
 **How:** In _match_table, after reciprocal folding, try 1-x and x+1 against the

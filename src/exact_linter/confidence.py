@@ -18,8 +18,9 @@ DEFAULT_MIN_SURPLUS = 2.0
 # searches (coefficient combinations over the constant basis)
 PSLQ_SEARCH_DIGITS = 6.0
 
-# reciprocal folding doubles the table search, so charge log10(2)
-RECIPROCAL_PENALTY = math.log10(2)
+# folding (direct, reciprocal, complement, shift) searches the table 4x
+# over, so charge log10(4) for whichever fold produced the match
+FOLD_PENALTY = math.log10(4)
 
 
 def integer_digit_cost(expr: str) -> int:

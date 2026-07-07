@@ -37,9 +37,12 @@ data-like values are ignored), then run through three recognition tiers:
    (via `mpmath.identify`) searches for combinations like `(3*pi)/4` that the table
    does not cover.
 
-The table tier also does **reciprocal folding**: a literal that is `1/entry` for any
-table entry is recognized even when only the plain form is listed, so every reciprocal
-is covered for free.
+The table tier also folds each entry a few extra ways so the table covers more than
+what's literally listed: **reciprocal folding** (`1/entry`, e.g. an unlisted `1/sqrt(5)`
+via the listed `sqrt(5)`), **complement folding** (`1-entry`, e.g. `1 - 1/e`, the
+exponential-saturation constant), and **shift folding** (`entry+1`), the last two
+restricted to entries between 0 and 2 so they don't produce nonsense like "1 minus
+Avogadro's number".
 
 ## Truncation detection
 
