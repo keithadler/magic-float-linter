@@ -62,6 +62,40 @@ def test_unrelated_comment_does_not_suppress():
     assert extract_source(src, Path("s.py"))[0].suppressed is False
 
 
+def test_bare_ignore_has_no_codes():
+    src = "x = 3.141592653589793  # exact: ignore\n"
+    lit = extract_source(src, Path("s.py"))[0]
+    assert lit.suppressed is True
+    assert lit.suppressed_codes is None  # None = every code
+
+
+def test_bracketed_ignore_single_code():
+    src = "x = 3.14159  # exact: ignore[truncated]\n"
+    lit = extract_source(src, Path("s.py"))[0]
+    assert lit.suppressed is True
+    assert lit.suppressed_codes == frozenset({"truncated"})
+
+
+def test_bracketed_ignore_multiple_codes():
+    src = "x = 3.14159  # exact: ignore[truncated, near-miss]\n"
+    lit = extract_source(src, Path("s.py"))[0]
+    assert lit.suppressed_codes == frozenset({"truncated", "near-miss"})
+
+
+def test_bracketed_ignore_above_line():
+    src = "# exact: ignore[near-miss]\nx = 2.71827\n"
+    lit = extract_source(src, Path("s.py"))[0]
+    assert lit.suppressed is True
+    assert lit.suppressed_codes == frozenset({"near-miss"})
+
+
+def test_empty_brackets_behaves_like_bare_ignore():
+    src = "x = 3.14159  # exact: ignore[]\n"
+    lit = extract_source(src, Path("s.py"))[0]
+    assert lit.suppressed is True
+    assert lit.suppressed_codes is None
+
+
 def test_list_of_short_tuples_is_nested_data():
     # matplotlib-style colormap table: a list of 3-element RGB triples.
     # Each inner tuple is short (3 < the plain sequence threshold) but the

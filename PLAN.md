@@ -729,6 +729,48 @@ is silence, not a wrong claim. Same discipline as the other two fixes: a
 real corpus run surfaced something the unit tests couldn't have, because the
 unit tests were written by the same reasoning that introduced the entry.
 
+### Rule codes + --select/--ignore [DONE 2026-07-07]
+**Goal:** the first item from a "make it more feature complete" review -
+every mature linter (flake8, ruff, pylint) lets you configure per-finding-
+type, not just per-file/per-line. `--truncation-only`/`--near-miss-only`
+were blunt binary toggles with no way to compose them, no way to say
+"ignore near-miss in this one file," and no stable identifier for a finding
+category at all (SARIF already had rule IDs internally, nothing else did).
+**Files:** recognize.py (`Match.code` property: "recognized" | "truncated" |
+"near-miss", computed from the existing truncated/near_miss booleans - no
+new stored field, so it can't drift from them), sequences.py (`SequenceMatch.
+code` always "sequence"), extract.py (suppression regex extended to accept
+an optional bracketed code list: `# exact: ignore[truncated,near-miss]`;
+bare `# exact: ignore` still suppresses every code, unchanged), config.py
+(`select`/`ignore` tuples in `[tool.exact]`; also added `near_miss_only` to
+config, which had been CLI-only - a small existing inconsistency fixed
+while touching this code), cli.py (`--select`/`--ignore` flags,
+`resolve_allowed_codes()` composing them with the truncation/near-miss
+shortcuts as sugar, `scan_file`'s per-literal filtering rewritten around a
+single `allowed_codes: frozenset[str] | None` parameter instead of two
+separate boolean flags), report.py (`code` added to JSON output - `asdict()`
+does not serialize `@property`, so it needed an explicit line, not just
+adding the property).
+**Composition semantics:** `--select` restricts to exactly those codes;
+`--ignore` removes codes from whatever's currently allowed (everything, by
+default); `--select` wins if both it and the shortcut flags are given.
+Config values follow the same "CLI overrides config" pattern as every other
+setting.
+**Suppression ordering preserved a subtlety on purpose:** the bare
+"suppress everything" case is still checked *before* the recognition search
+runs, exactly as before this feature existed (a pure optimization + the
+original behavior, unaffected). Code-specific suppression can't be resolved
+until the match - and its `code` - is known, so that check is deferred to
+just after `recognize()` returns, not before.
+**Validated:** 28 new tests (unit coverage of `resolve_allowed_codes`'s
+composition rules, extraction-level bracketed-suppression parsing, and CLI
+integration - including a discrimination test proving `# exact:
+ignore[near-miss]` does *not* suppress a finding that turns out to be
+`truncated`, not just "any suppression comment nukes everything"). Full
+stdlib re-scan: identical 54 findings (29 truncated, 4 near-miss) to the
+pre-refactor baseline - zero behavior change for anyone not using the new
+flags. 233 tests, ruff + self-lint clean.
+
 ---
 
 ## Step ordering notes for the executor

@@ -169,6 +169,7 @@ def render_json(
     for finding in findings:
         item = asdict(finding.match)
         item["truncated"] = finding.match.truncated
+        item["code"] = finding.match.code
         item["idiomatic"] = finding.idiomatic
         item["display_suggestion"] = finding.suggestion
         item["import_note"] = finding.import_note
@@ -189,6 +190,7 @@ def render_json(
                 "elements": sf.sequence.elements,
                 "name": sf.match.name,
                 "suggestion": sf.match.suggestion,
+                "code": sf.match.code,
             }
         )
     return json.dumps(payload, indent=2)

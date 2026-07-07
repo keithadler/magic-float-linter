@@ -55,7 +55,13 @@ all grew substantially; this is effectively the tool's first "real" release.
   SARIF (for GitHub code scanning) alongside the original text/JSON.
 - `[tool.exact]` configuration in `pyproject.toml`, including
   `[tool.exact.constants]` for project-specific named constants.
-- `# exact: ignore` inline suppression.
+- `# exact: ignore` inline suppression, with an optional bracketed code list
+  (`# exact: ignore[truncated]`) to suppress only specific finding codes.
+- `--select`/`--ignore` - every finding now has a stable code (`recognized`,
+  `truncated`, `near-miss`, `sequence`); select/ignore filter on it directly,
+  the same model ruff and flake8 use. `--truncation-only`/`--near-miss-only`
+  still work as sugar for `--select truncated`/`--select near-miss`.
+  Configurable via `[tool.exact] select`/`ignore` in `pyproject.toml`.
 
 ### Fixed
 

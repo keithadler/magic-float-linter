@@ -69,6 +69,19 @@ class Match:
         # also label it a truncation
         return self.precision_lost >= TRUNCATION_MIN_LOST and not self.near_miss
 
+    @property
+    def code(self) -> str:
+        """Stable finding category for --select/--ignore and per-line
+        "# exact: ignore[code]" suppression. Every Match falls into exactly
+        one of these three (near-miss and truncated are mutually exclusive
+        by construction - see `truncated` above); whole-sequence findings
+        (sequences.py) are always "sequence", the fourth code."""
+        if self.near_miss:
+            return "near-miss"
+        if self.truncated:
+            return "truncated"
+        return "recognized"
+
 
 def _agrees(x: mpmath.mpf, y: mpmath.mpf, digits: int) -> bool:
     if y == 0:

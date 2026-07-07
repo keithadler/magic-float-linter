@@ -31,6 +31,10 @@ from .report import (
 from .sequences import MIN_SEQUENCE_LENGTH, identify_sequence
 from .triage import MIN_DIGITS, skip_reason
 
+# stable finding categories for --select/--ignore and per-line
+# "# exact: ignore[code]" suppression (see recognize.Match.code / sequences.CODE)
+CODES = ("recognized", "truncated", "near-miss", "sequence")
+
 EXCLUDED_DIRS = {
     ".git",
     ".hg",
@@ -74,18 +78,27 @@ def is_test_file(path: Path) -> bool:
 def scan_file(
     file: Path,
     min_surplus: float,
-    truncation_only: bool,
-    near_miss_only: bool = False,
+    allowed_codes: frozenset[str] | None,
     min_digits: int = MIN_DIGITS,
     extra_entries: tuple = (),
     find_sequences: bool = True,
 ) -> tuple[list[Finding], list[SequenceFinding], dict[str, int]]:
-    """Scan one file; top-level so ProcessPoolExecutor can pickle it."""
+    """Scan one file; top-level so ProcessPoolExecutor can pickle it.
+
+    `allowed_codes` is the result of resolving --select/--ignore (and the
+    --truncation-only/--near-miss-only shortcuts, which are sugar for it) -
+    None means every code is allowed.
+    """
     findings: list[Finding] = []
     skipped: Counter[str] = Counter()
     info = extract_file_info(file)
     for literal in info.literals:
-        if literal.suppressed:
+        # the bare "suppress everything" case is checked here, before the
+        # (cached but not free) recognition search, exactly as before this
+        # feature existed. Code-specific suppression ("ignore[truncated]")
+        # can't be resolved until the match - and its code - is known, so
+        # that check is deferred below.
+        if literal.suppressed and literal.suppressed_codes is None:
             skipped["suppressed by comment"] += 1
             continue
         reason = skip_reason(literal, min_digits=min_digits)
@@ -95,27 +108,28 @@ def scan_file(
         match = recognize(literal.text, min_surplus=min_surplus, extra_entries=extra_entries)
         if match is None:
             skipped["no confident match"] += 1
-        elif truncation_only and not match.truncated:
-            skipped["recognized but not truncated"] += 1
-        elif near_miss_only and not match.near_miss:
-            skipped["recognized but not a near-miss"] += 1
-        else:
-            idiom = idiomatic(match, literal)
-            display, import_note = adjust_for_imports(idiom or match.suggestion, info)
-            findings.append(
-                Finding(
-                    literal,
-                    match,
-                    idiomatic=display if idiom else None,
-                    display_suggestion="" if idiom else display,
-                    import_note=import_note,
-                )
+            continue
+        code = match.code
+        if literal.suppressed and code in literal.suppressed_codes:
+            skipped["suppressed by comment"] += 1
+            continue
+        if allowed_codes is not None and code not in allowed_codes:
+            skipped[f"excluded by --select/--ignore ({code})"] += 1
+            continue
+        idiom = idiomatic(match, literal)
+        display, import_note = adjust_for_imports(idiom or match.suggestion, info)
+        findings.append(
+            Finding(
+                literal,
+                match,
+                idiomatic=display if idiom else None,
+                display_suggestion="" if idiom else display,
+                import_note=import_note,
             )
+        )
 
     sequence_findings: list[SequenceFinding] = []
-    # sequences are purely informational (see cli.main): skip the search
-    # entirely under modes that are specifically about individual literals
-    if find_sequences and not (truncation_only or near_miss_only):
+    if find_sequences and (allowed_codes is None or "sequence" in allowed_codes):
         for seq in info.sequences:
             if len(seq.elements) < MIN_SEQUENCE_LENGTH:
                 continue
@@ -172,6 +186,48 @@ def _run_fixes(findings: list[Finding], fix_truncated: bool, diff: bool) -> int:
         for file, line, old, new in value_changes:
             print(f"  {file}:{line}  {old} -> {new}")
     return 0
+
+
+def _parse_code_list(raw: str | None) -> tuple[str, ...]:
+    if not raw:
+        return ()
+    return tuple(c.strip() for c in raw.split(",") if c.strip())
+
+
+def resolve_allowed_codes(
+    select: tuple[str, ...],
+    ignore: tuple[str, ...],
+    truncation_only: bool,
+    near_miss_only: bool,
+) -> tuple[frozenset[str] | None, str | None]:
+    """Resolve --select/--ignore - plus --truncation-only/--near-miss-only,
+    which are sugar for --select - into the codes scan_file should report.
+
+    Returns (allowed_codes, error_message); allowed_codes is None when every
+    code is allowed. error_message is set only when an unknown code was
+    given, in which case allowed_codes is meaningless and the caller should
+    print the error and exit.
+    """
+    for code in (*select, *ignore):
+        if code not in CODES:
+            return None, f"unknown finding code {code!r} (choices: {', '.join(CODES)})"
+
+    if select:
+        allowed: frozenset[str] | None = frozenset(select)
+    elif truncation_only or near_miss_only:
+        shortcut = set()
+        if truncation_only:
+            shortcut.add("truncated")
+        if near_miss_only:
+            shortcut.add("near-miss")
+        allowed = frozenset(shortcut)
+    else:
+        allowed = None
+
+    if ignore:
+        allowed = frozenset(CODES if allowed is None else allowed) - frozenset(ignore)
+
+    return allowed, None
 
 
 def _safe_eval(expr: str) -> float:
@@ -278,6 +334,20 @@ def main(argv: Sequence[str] | None = None) -> int:
         help="report only near-misses (literals that look like a typo'd known constant)",
     )
     parser.add_argument(
+        "--select",
+        default=None,
+        help=(
+            "report only these finding codes, comma-separated"
+            f" (choices: {', '.join(CODES)}). Takes precedence over"
+            " --truncation-only/--near-miss-only if both are given"
+        ),
+    )
+    parser.add_argument(
+        "--ignore",
+        default=None,
+        help="never report these finding codes, comma-separated (same choices as --select)",
+    )
+    parser.add_argument(
         "--exclude-tests",
         action="store_true",
         help="skip test files (test_*.py, *_test.py, or anything under a test/tests directory)",
@@ -359,6 +429,15 @@ def main(argv: Sequence[str] | None = None) -> int:
     )
     min_digits = config.min_digits if config.min_digits is not None else MIN_DIGITS
     truncation_only = args.truncation_only or config.truncation_only
+    near_miss_only = args.near_miss_only or config.near_miss_only
+    select = _parse_code_list(args.select) or config.select
+    ignore = _parse_code_list(args.ignore) or config.ignore
+    allowed_codes, code_error = resolve_allowed_codes(
+        select, ignore, truncation_only, near_miss_only
+    )
+    if code_error:
+        print(f"error: {code_error}", file=sys.stderr)
+        return 2
     exclude_tests = args.exclude_tests or config.exclude_tests
 
     files: list[Path] = []
@@ -378,8 +457,7 @@ def main(argv: Sequence[str] | None = None) -> int:
     worker = partial(
         scan_file,
         min_surplus=min_surplus,
-        truncation_only=truncation_only,
-        near_miss_only=args.near_miss_only,
+        allowed_codes=allowed_codes,
         min_digits=min_digits,
         extra_entries=config.constants,
         find_sequences=not args.no_sequences,

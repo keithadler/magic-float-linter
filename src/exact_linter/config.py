@@ -26,6 +26,9 @@ class Config:
     min_digits: int | None = None
     exclude: tuple[str, ...] = ()  # fnmatch globs against the file path
     truncation_only: bool = False
+    near_miss_only: bool = False
+    select: tuple[str, ...] = ()  # finding codes to report exclusively
+    ignore: tuple[str, ...] = ()  # finding codes to never report
     exclude_tests: bool = False
     constants: tuple[ConstantEntry, ...] = ()  # project-specific table entries
     source: Path | None = None  # the pyproject.toml the config came from
@@ -74,6 +77,9 @@ def load_config(start: Path) -> Config:
             min_digits=_get(section, "min_digits"),
             exclude=tuple(_get(section, "exclude") or ()),
             truncation_only=bool(_get(section, "truncation_only") or False),
+            near_miss_only=bool(_get(section, "near_miss_only") or False),
+            select=tuple(_get(section, "select") or ()),
+            ignore=tuple(_get(section, "ignore") or ()),
             exclude_tests=bool(_get(section, "exclude_tests") or False),
             constants=_parse_constants(section),
             source=pyproject,
