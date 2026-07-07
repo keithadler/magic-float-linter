@@ -13,6 +13,9 @@ from .recognize import Match
 class Finding:
     literal: FloatLiteral
     match: Match
+    # idiomatic rewrite of the literal's whole enclosing expression
+    # (e.g. "math.radians(deg)"), when a context rule applies
+    idiomatic: str | None = None
 
 
 def render_text(
@@ -30,7 +33,14 @@ def render_text(
         marker = "  TRUNCATED" if match.truncated else ""
         lines.append(f"{location}  {lit.text}{context}{marker}")
         lines.append(f"    = {match.form}{note}")
-        lines.append(f"    suggestion: {match.suggestion}")
+        if finding.idiomatic:
+            lines.append(
+                f"    suggestion: {finding.idiomatic}"
+                f"  (replaces the whole expression; the constant alone is"
+                f" {match.suggestion})"
+            )
+        else:
+            lines.append(f"    suggestion: {match.suggestion}")
         if match.truncated:
             truncated_count += 1
             lines.append(
@@ -72,6 +82,7 @@ def render_json(findings: list[Finding]) -> str:
     for finding in findings:
         item = asdict(finding.match)
         item["truncated"] = finding.match.truncated
+        item["idiomatic"] = finding.idiomatic
         item.update(
             file=str(finding.literal.file),
             line=finding.literal.line,

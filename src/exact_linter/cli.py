@@ -12,6 +12,7 @@ from pathlib import Path
 
 from .confidence import DEFAULT_MIN_SURPLUS
 from .extract import extract_file
+from .idioms import idiomatic
 from .recognize import recognize
 from .report import Finding, render_github, render_json, render_text
 from .triage import skip_reason
@@ -76,7 +77,7 @@ def scan_file(
         elif truncation_only and not match.truncated:
             skipped["recognized but not truncated"] += 1
         else:
-            findings.append(Finding(literal, match))
+            findings.append(Finding(literal, match, idiomatic=idiomatic(match, literal)))
     return findings, dict(skipped)
 
 

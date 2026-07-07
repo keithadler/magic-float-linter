@@ -79,6 +79,50 @@ def test_dict_of_tuples_is_nested_data():
     assert all(lit.sequence_size > 3 for lit in literals)
 
 
+def test_operation_capture_multiplication():
+    src = "rad = deg * 0.017453292519943295\n"
+    lit = extract_source(src, Path("s.py"))[0]
+    assert lit.op == "mul"
+    assert lit.other_operand == "deg"
+
+
+def test_operation_capture_division_denominator():
+    src = "half_lives = t / 2.302585092994046\n"
+    lit = extract_source(src, Path("s.py"))[0]
+    assert lit.op == "div-den"
+    assert lit.other_operand == "t"
+
+
+def test_operation_capture_division_numerator():
+    src = "y = 57.29577951308232 / x\n"
+    lit = extract_source(src, Path("s.py"))[0]
+    assert lit.op == "div-num"
+    assert lit.other_operand == "x"
+
+
+def test_operation_capture_attribute_operand():
+    src = "rad = obj.angle * 0.017453292519943295\n"
+    lit = extract_source(src, Path("s.py"))[0]
+    assert lit.op == "mul"
+    assert lit.other_operand == "obj.angle"
+
+
+def test_operation_complex_operand_not_captured():
+    # the other operand is an expression, not a simple name: op is still
+    # known but there's nothing safe to substitute into an idiom
+    src = "rad = (a + b) * 0.017453292519943295\n"
+    lit = extract_source(src, Path("s.py"))[0]
+    assert lit.op == "mul"
+    assert lit.other_operand == ""
+
+
+def test_bare_assignment_has_no_operation():
+    src = "RAD = 0.017453292519943295\n"
+    lit = extract_source(src, Path("s.py"))[0]
+    assert lit.op == ""
+    assert lit.other_operand == ""
+
+
 def test_standalone_short_tuple_is_not_nested_data():
     # a plain coordinate pair, not nested in another container, should be
     # unaffected by the nested-container rule: sequence_size is just the
