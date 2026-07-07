@@ -93,14 +93,44 @@ def test_logspace_two_bases_with_fractional_exponent():
 
 
 def test_logspace_rejects_pure_rational():
-    # 3/2 has no pi factor - that's the rational tier's call, not logspace's
+    # 3/2 has no pi factor and every exponent is an integer (2*3**-1*... with
+    # denominator 1) - x really is a plain rational, the rational tier's call
     match = recognize("1.500000000000")
     assert match is None or match.tier != "logspace"
 
 
-def test_logspace_known_miss_needs_wider_prime_basis():
-    # 7/8 * (4/11)**(4/3), the ACDM neutrino energy-density correction found
-    # (undetected) in astropy's cosmology module during the corpus study.
-    # Needs primes 7 and 11, outside our basis of {2, 3, 5, pi} - documenting
-    # this as a known, deliberate limitation rather than silently missing it.
+def test_logspace_no_pi_but_irrational_root_is_not_rejected():
+    # a relation with no pi term is NOT automatically "plain rational in
+    # disguise": if the PSLQ coefficient on x doesn't evenly divide the other
+    # exponents, x is an irrational root of a rational (here, a cube root),
+    # which the rational tier could never find. Regression test for a real
+    # bug: the original code bailed out whenever the pi-coefficient was zero,
+    # regardless of whether the result was actually rational.
+    # x**3 == 7**3 / (2 * 11**4), i.e. x == 2**(-1/3) * 7 * 11**(-4/3)
+    import mpmath
+
+    with mpmath.workdps(40):
+        x = (mpmath.mpf(7) ** 3 / (2 * mpmath.mpf(11) ** 4)) ** (mpmath.mpf(1) / 3)
+        text = mpmath.nstr(x, 17, strip_zeros=False)
+    match = recognize(text)
+    assert match is not None
+    assert match.tier == "logspace"
+    assert match.form == "2**(-1/3)*7*11**(-4/3)"
+
+
+def test_logspace_astropy_neutrino_correction_found_but_underevidenced():
+    # 7/8 * (4/11)**(4/3), the LambdaCDM neutrino energy-density correction
+    # found undetected in astropy's cosmology module during the corpus study.
+    # The widened basis {2,3,5,7,11} plus the "no pi" bugfix above now let
+    # PSLQ find the relation (2**(-1/3) * 7 * 11**(-4/3)) even for this
+    # literal - but astropy only wrote 11 significant digits, and honestly
+    # supporting a 3-factor relation with a denominator-3 exponent needs more
+    # evidence than that. The default confidence gate correctly declines it
+    # (surplus -2.0); a user auditing marginal cases can still recover it by
+    # lowering --min-surplus. This is the gate working as designed, not a
+    # remaining gap in the search.
     assert recognize("0.22710731766") is None
+    found = recognize("0.22710731766", min_surplus=-3.0)
+    assert found is not None
+    assert found.tier == "logspace"
+    assert found.form == "2**(-1/3)*7*11**(-4/3)"

@@ -24,11 +24,17 @@ PSLQ_MIN_DIGITS = 10  # PSLQ combos need strong evidence; skip short literals
 PSLQ_CONSTANTS = ("pi", "e", "ln(2)", "sqrt(2)", "sqrt(3)")
 MAX_RATIONAL_DENOMINATOR = 10_000
 
-LOGSPACE_MIN_DIGITS = 12
-# 2, 3, 5, pi: independent primes plus pi. Deliberately excludes 10 (=2*5) -
-# including it creates a built-in linear dependency (ln10 - ln2 - ln5 = 0)
-# that PSLQ finds instead of any real relation involving x.
-LOGSPACE_BASES = (2, 3, 5)
+LOGSPACE_MIN_DIGITS = 11
+# 2, 3, 5, 7, 11, pi: independent primes plus pi. Deliberately excludes 10
+# (=2*5) - including it creates a built-in linear dependency
+# (ln10 - ln2 - ln5 = 0) that PSLQ finds instead of any real relation
+# involving x. Widened from {2,3,5} to include 7 and 11 after the corpus
+# study found a real, human-documented miss needing exactly those primes
+# (astropy's neutrino energy-density correction, 7/8 * (4/11)**(4/3));
+# empirically re-checked against 2000+ random numbers per digit count near
+# LOGSPACE_MIN_DIGITS and the false-positive rate stayed at 0, so no
+# confidence charge increase was needed for the wider search.
+LOGSPACE_BASES = (2, 3, 5, 7, 11)
 
 # A Python float carries about this many significant decimal digits
 # (53 * log10(2)). A literal accurate to fewer digits than the exact form
@@ -328,14 +334,22 @@ def _match_logspace(x: mpmath.mpf, digits: int) -> Match | None:
     if rel is None or rel[0] == 0:
         return None
     c0 = rel[0]
-    if rel[-1] == 0:
-        # no pi factor: x is a plain rational in disguise, the rational
-        # tier's call to make (and it already declined, or we'd not be here)
-        return None
     factors = []
     for base, c in zip((*LOGSPACE_BASES, "pi"), rel[1:]):
         if c != 0:
             factors.append((str(base), Fraction(-c, c0)))
+    if not factors:
+        return None  # degenerate: x == 1
+    if rel[-1] == 0 and all(exp.denominator == 1 for _, exp in factors):
+        # no pi factor AND every exponent is an integer: x is an exact
+        # rational in disguise (a product of integer prime powers), the
+        # rational tier's territory (and it already declined, or we'd not be
+        # here). But a zero pi-coefficient does NOT by itself mean x is
+        # rational - c0 not dividing an exponent evenly makes x an irrational
+        # root of a rational even with no pi involved at all (e.g. x**3 =
+        # 7**3/(2*11**4), a cube root, still logspace's job), so that case
+        # must fall through instead of bailing here.
+        return None
     with mpmath.workdps(digits + 20):
         value = mpmath.mpf(1)
         for base, exp in factors:
