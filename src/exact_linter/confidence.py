@@ -18,6 +18,9 @@ DEFAULT_MIN_SURPLUS = 2.0
 # searches (coefficient combinations over the constant basis)
 PSLQ_SEARCH_DIGITS = 6.0
 
+# reciprocal folding doubles the table search, so charge log10(2)
+RECIPROCAL_PENALTY = math.log10(2)
+
 
 def integer_digit_cost(expr: str) -> int:
     return sum(len(group) for group in re.findall(r"\d+", expr))

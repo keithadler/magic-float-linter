@@ -21,21 +21,32 @@ def render_text(
     verbose: bool = False,
 ) -> str:
     lines: list[str] = []
+    truncated_count = 0
     for finding in findings:
         lit, match = finding.literal, finding.match
         location = f"{lit.file}:{lit.line}:{lit.col + 1}"
         context = f"  ({lit.context})" if lit.context else ""
         note = f"  [{match.note}]" if match.note else ""
-        lines.append(f"{location}  {lit.text}{context}")
+        marker = "  TRUNCATED" if match.truncated else ""
+        lines.append(f"{location}  {lit.text}{context}{marker}")
         lines.append(f"    = {match.form}{note}")
         lines.append(f"    suggestion: {match.suggestion}")
+        if match.truncated:
+            truncated_count += 1
+            lines.append(
+                f"    precision: accurate to only {match.matched_digits} digits;"
+                f" the exact form recovers ~{match.precision_lost} lost digits"
+            )
         lines.append(
             f"    confidence: matches all {match.matched_digits} given digits,"
             f" surplus {match.surplus:.1f}"
         )
         lines.append("")
     plural = "" if len(findings) == 1 else "s"
-    lines.append(f"{len(findings)} recognized constant{plural} found.")
+    summary = f"{len(findings)} recognized constant{plural} found"
+    if truncated_count:
+        summary += f" ({truncated_count} truncated, losing precision)"
+    lines.append(summary + ".")
     if verbose and skipped:
         lines.append("")
         lines.append("skipped literals:")
@@ -48,6 +59,7 @@ def render_json(findings: list[Finding]) -> str:
     payload = []
     for finding in findings:
         item = asdict(finding.match)
+        item["truncated"] = finding.match.truncated
         item.update(
             file=str(finding.literal.file),
             line=finding.literal.line,

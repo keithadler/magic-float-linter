@@ -1,4 +1,11 @@
-"""Recognition engine: table lookup, then rational check, then PSLQ search."""
+"""Recognition engine: table lookup, then rational check, then PSLQ search.
+
+Beyond naming a constant, the engine also measures how much numerical
+accuracy a literal *loses* by being written out as a short decimal instead
+of the exact form. A literal like 3.14159 names pi but is only accurate to
+six digits inside a double that holds sixteen; that lost precision is often
+a real bug, and it is reported as a truncation.
+"""
 
 from __future__ import annotations
 
@@ -16,6 +23,12 @@ PSLQ_MIN_DIGITS = 10  # PSLQ combos need strong evidence; skip short literals
 PSLQ_CONSTANTS = ("pi", "e", "ln(2)", "sqrt(2)", "sqrt(3)")
 MAX_RATIONAL_DENOMINATOR = 10_000
 
+# A Python float carries about this many significant decimal digits
+# (53 * log10(2)). A literal accurate to fewer digits than the exact form
+# would give has lost precision.
+DOUBLE_DIGITS = 15.95
+TRUNCATION_MIN_LOST = 3  # report truncation once this many digits are lost
+
 
 @dataclass
 class Match:
@@ -25,12 +38,40 @@ class Match:
     tier: str  # "table" | "rational" | "pslq"
     matched_digits: int
     surplus: float
+    precision_lost: int = 0  # digits of accuracy lost vs. the exact form
+
+    @property
+    def truncated(self) -> bool:
+        return self.precision_lost >= TRUNCATION_MIN_LOST
 
 
 def _agrees(x: mpmath.mpf, y: mpmath.mpf, digits: int) -> bool:
     if y == 0:
         return False
     return abs(x - y) <= abs(y) * mpmath.mpf(10) ** (1 - digits)
+
+
+def _precision_lost(x: mpmath.mpf, true_value: mpmath.mpf) -> int:
+    """Digits of accuracy the literal x loses relative to the exact value."""
+    if true_value == 0:
+        return 0
+    rel = abs(x - true_value) / abs(true_value)
+    if rel == 0:
+        return 0
+    accuracy = -mpmath.log10(rel)
+    lost = DOUBLE_DIGITS - accuracy
+    return max(0, int(mpmath.floor(lost + mpmath.mpf("0.5"))))
+
+
+def _needs_parens(suggestion: str) -> bool:
+    """True if using the suggestion as a denominator needs parentheses.
+
+    A bare name or a single function call is safe (`1 / math.sqrt(5)`); a
+    top-level binary operator is not (`1 / (math.sqrt(2) / 2)`). Table
+    suggestions always space their binary operators, so their presence is
+    the signal.
+    """
+    return re.search(r"\s[-+*/]|\*\*", suggestion) is not None
 
 
 def _match_table(x: mpmath.mpf, digits: int) -> Match | None:
@@ -44,7 +85,31 @@ def _match_table(x: mpmath.mpf, digits: int) -> Match | None:
                 tier="table",
                 matched_digits=digits,
                 surplus=confidence.table_surplus(digits, len(rows)),
+                precision_lost=_precision_lost(x, value),
             )
+    # Reciprocal folding: a literal may be 1/entry for an entry we listed
+    # only in its plain form. This extends the table's reach to every
+    # reciprocal for free, at a small confidence charge for the wider search.
+    if x != 0:
+        recip = 1 / x
+        for value, entry in rows:
+            if _agrees(recip, value, digits):
+                true_value = 1 / value
+                sugg = (
+                    f"({entry.suggestion})"
+                    if _needs_parens(entry.suggestion)
+                    else entry.suggestion
+                )
+                return Match(
+                    form=f"1/({entry.form})",
+                    suggestion=f"1 / {sugg}",
+                    note=entry.note,
+                    tier="table",
+                    matched_digits=digits,
+                    surplus=confidence.table_surplus(digits, len(rows))
+                    - confidence.RECIPROCAL_PENALTY,
+                    precision_lost=_precision_lost(x, true_value),
+                )
     return None
 
 
@@ -52,7 +117,8 @@ def _match_rational(x: mpmath.mpf, digits: int) -> Match | None:
     frac = Fraction(float(x)).limit_denominator(MAX_RATIONAL_DENOMINATOR)
     if frac.denominator == 1:
         return None
-    if not _agrees(x, mpmath.mpf(frac.numerator) / frac.denominator, digits):
+    true_value = mpmath.mpf(frac.numerator) / frac.denominator
+    if not _agrees(x, true_value, digits):
         return None
     reduced = frac.denominator
     for factor in (2, 5):
@@ -69,6 +135,7 @@ def _match_rational(x: mpmath.mpf, digits: int) -> Match | None:
         tier="rational",
         matched_digits=digits,
         surplus=confidence.rational_surplus(digits, frac.numerator, frac.denominator),
+        precision_lost=_precision_lost(x, true_value),
     )
 
 
@@ -117,6 +184,7 @@ def _match_pslq(x: mpmath.mpf, digits: int) -> Match | None:
             return None
         if not _agrees(x, value, digits):
             return None
+        lost = _precision_lost(x, value)
     return Match(
         form=found,
         suggestion=_to_python(found),
@@ -124,6 +192,7 @@ def _match_pslq(x: mpmath.mpf, digits: int) -> Match | None:
         tier="pslq",
         matched_digits=digits,
         surplus=confidence.pslq_surplus(digits, found),
+        precision_lost=lost,
     )
 
 
