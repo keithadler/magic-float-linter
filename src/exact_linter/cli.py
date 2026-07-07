@@ -38,7 +38,12 @@ def iter_python_files(paths: Sequence[str]) -> Iterator[Path]:
             yield path
         elif path.is_dir():
             for sub in sorted(path.rglob("*.py")):
-                if not any(part in EXCLUDED_DIRS for part in sub.parts):
+                # only exclude directories found *within* the scanned tree (a
+                # nested venv, a vendored build dir); ancestors of the scan
+                # root itself don't count, or scanning a path that happens to
+                # live inside a venv or site-packages would find nothing
+                nested_dirs = sub.relative_to(path).parts[:-1]
+                if not any(part in EXCLUDED_DIRS for part in nested_dirs):
                     yield sub
 
 
