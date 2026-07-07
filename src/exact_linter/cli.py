@@ -3,8 +3,10 @@
 from __future__ import annotations
 
 import argparse
+import json
 import sys
 from collections import Counter
+from dataclasses import asdict
 from collections.abc import Iterator, Sequence
 from concurrent.futures import ProcessPoolExecutor
 from fnmatch import fnmatch
@@ -158,13 +160,72 @@ def _safe_eval(expr: str) -> float:
         return float("nan")
 
 
+def _run_identify(argv: Sequence[str]) -> int:
+    """`exact identify <number>`: explain one value directly, no file scan.
+
+    The one-shot "what is this number" query - the Inverse Symbolic
+    Calculator, as a terminal command, for whatever value you're staring at
+    right now instead of one buried in a source file.
+    """
+    parser = argparse.ArgumentParser(
+        prog="exact identify",
+        description="Identify a single float value as an exact form.",
+    )
+    parser.add_argument("value", help="the number to identify, e.g. 0.2068966")
+    parser.add_argument(
+        "--min-surplus",
+        type=float,
+        default=None,
+        help=f"evidence surplus required to report a match (default: {DEFAULT_MIN_SURPLUS})",
+    )
+    parser.add_argument("--json", action="store_true", help="emit as JSON")
+    args = parser.parse_args(argv)
+
+    try:
+        float(args.value)
+    except ValueError:
+        print(f"error: {args.value!r} is not a number", file=sys.stderr)
+        return 2
+
+    min_surplus = args.min_surplus if args.min_surplus is not None else DEFAULT_MIN_SURPLUS
+    match = recognize(args.value, min_surplus=min_surplus)
+
+    if args.json:
+        print(json.dumps(asdict(match) if match else None, indent=2))
+        return 0 if match else 1
+
+    if match is None:
+        print(f"{args.value}: no confident match")
+        return 1
+
+    tag = " - LIKELY TYPO" if match.near_miss else (" - truncated" if match.truncated else "")
+    print(f"{args.value} = {match.form}{tag}")
+    print(f"  suggestion: {match.suggestion}")
+    if match.note:
+        print(f"  note: {match.note}")
+    if match.truncated:
+        print(
+            f"  precision: accurate to only {match.matched_digits} digits;"
+            f" the exact form recovers ~{match.precision_lost} lost digits"
+        )
+    print(f"  confidence: matches all {match.matched_digits} given digits, surplus {match.surplus:.1f}")
+    return 0
+
+
 def main(argv: Sequence[str] | None = None) -> int:
+    raw_argv = sys.argv[1:] if argv is None else list(argv)
+    if raw_argv[:1] == ["identify"]:
+        return _run_identify(raw_argv[1:])
+
     parser = argparse.ArgumentParser(
         prog="exact",
         description=(
             "Find magic float constants (pi/180, 1/ln 2, 2/3, ...) in Python code"
             " and suggest exact, readable replacements."
+            "\n\nTip: `exact identify <number>` explains a single value directly,"
+            " without scanning any files."
         ),
+        formatter_class=argparse.RawDescriptionHelpFormatter,
     )
     parser.add_argument("paths", nargs="*", default=["."], help="files or directories to scan")
     parser.add_argument(
