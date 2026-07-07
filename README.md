@@ -97,6 +97,34 @@ Idiom rules are limited to exact algebraic identities. `x * 0.017453...` *is*
 (x times 1/ln 2) is `log2(e**x)`, not `log2(x)`, so no log idiom fires - the
 constant's note gives the hint and leaves the judgment to the human.
 
+## Fixing in place
+
+`--fix` rewrites only literals whose exact form evaluates (using `math` alone)
+to a bit-identical float, so it never changes what the program computes - it
+just makes an exact value readable, inserting `import math` if needed:
+
+```
+$ exact --fix geo.py
+$ cat geo.py
+import math
+R = math.pi / 180
+```
+
+`--fix-truncated` additionally rewrites truncated table constants, which
+*does* change values (to the more accurate exact form), and reports each
+change:
+
+```
+$ exact --fix-truncated autolev.py
+2 literal(s) fixed, 0 left unchanged.
+WARNING: --fix-truncated changed these values to their exact form:
+  autolev.py:3  0.0174533 -> math.pi / 180
+```
+
+Add `--diff` to preview either as a unified diff without writing. Every edit is
+located from the re-parsed AST and verified against the source before it is
+applied; anything that does not verify is skipped, never guessed at.
+
 ## Suppressing a finding
 
 Add a `# exact: ignore` comment on the literal's line (or on its own line directly
@@ -126,6 +154,9 @@ exact [paths ...]        scan files or directories (default: .)
   --exclude-tests        skip test_*.py, *_test.py, and test(s)/ directories
   --min-surplus N        evidence threshold (default 2.0)
   --jobs N, -j N         scan files in N parallel processes (default 1)
+  --fix                  rewrite literals whose exact form is bit-identical
+  --fix-truncated        also rewrite truncated table constants (changes values)
+  --diff                 with --fix, print a unified diff instead of writing
   --exit-zero            always exit 0, even with findings
   -v, --verbose          show counts of skipped literals
 ```

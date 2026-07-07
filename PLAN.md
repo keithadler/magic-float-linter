@@ -162,7 +162,7 @@ literals).
 
 ## Phase C - fix mode (steps 9-11)
 
-### Step 9: --fix for safe, full-precision rewrites
+### Step 9: --fix for safe, full-precision rewrites [DONE 2026-07-07]
 **Goal:** Automatic rewriting where it cannot change behavior meaningfully.
 **Files:** new src/exact_linter/fix.py, src/exact_linter/cli.py, tests/test_fix.py
 **How:** fix.py: `apply_fixes(path, findings) -> str` returns new source. Only fix
@@ -178,7 +178,7 @@ fixed/skipped.
 `x = math.pi`, file still parses, `float(eval)` equality held; truncated literal
 `3.14159` is NOT touched; running --fix twice changes nothing the second time.
 
-### Step 10: --fix-truncated (explicit, value-changing)
+### Step 10: --fix-truncated (explicit, value-changing) [DONE 2026-07-07]
 **Goal:** Let users opt in to fixing truncation bugs, which changes numeric values.
 **Files:** src/exact_linter/fix.py, src/exact_linter/cli.py, tests/test_fix.py
 **How:** Separate flag --fix-truncated (implies --fix). Only fixes findings with
@@ -187,7 +187,7 @@ banner listing each value change old -> new.
 **Accept:** `3.14159` becomes `math.pi` only under --fix-truncated; the summary
 lists the numeric delta.
 
-### Step 11: fixer hardening
+### Step 11: fixer hardening [DONE 2026-07-07]
 **Goal:** Trust. The fixer must never corrupt a file.
 **Files:** tests/test_fix.py
 **How:** Property-style tests: for a corpus of tricky sources (literal inside
