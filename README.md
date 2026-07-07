@@ -369,12 +369,14 @@ code-scanning setup required. Truncated constants are `::warning`, others are
 ## Does it work on real code?
 
 The sympy bug above isn't a one-off. See [the corpus study](docs/corpus-study.md):
-nine popular scientific Python packages, 911 recognized constants, and three
-verified upstream precision bugs total - sympy's AutoLev conversion,
-scikit-image writing the CIE Lab threshold `6/29` as `0.2068966`, and
-statsmodels' tricube kernel constant `70/81` as `0.864197530864`. On
-scikit-image the signal-to-noise is exactly right: 1064 float literals in,
-one finding out, and it's the real bug.
+nine popular scientific Python packages, and four verified upstream precision
+bugs found so far - sympy's AutoLev conversion, scikit-image writing the CIE
+Lab threshold `6/29` as `0.2068966`, statsmodels' tricube kernel constant
+`70/81` as `0.864197530864`, and **Pillow** hardcoding the inches-per-meter
+conversion as `39.3701` in `BmpImagePlugin.py` (both the BMP read and write
+paths) instead of the exact `39.37007874015748` - one of the most-installed
+packages on PyPI. On scikit-image the signal-to-noise is exactly right: 1064
+float literals in, one finding out, and it's the real bug.
 
 ## Roadmap
 

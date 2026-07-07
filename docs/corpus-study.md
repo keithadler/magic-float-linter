@@ -24,7 +24,7 @@ statsmodels 0.14.6, Pillow 12.3.0, mpmath 1.3.0, scikit-image 0.26.0.
 | numpy | 53 | 38 | almost entirely test fixtures |
 | matplotlib | 4 | 1 | after the nested-container triage fix; was 1314 before it |
 | scikit-image | 1 | 1 | the single survivor is a real bug (Lab 6/29) |
-| Pillow | 0 | 0 | few candidate literals at all |
+| Pillow | 0 | 0 | few candidate literals at all - see the update below, though: a later re-scan with an improved engine found 2 |
 | **total** | **911** | **147** | |
 
 ## Verified genuine findings (real code, real precision loss)
@@ -122,6 +122,33 @@ multiplicative with primes 7 and 11. This directly motivated the log-space PSLQ
 tier (commit `42f92d9`), which now catches monomials over {2, 3, 5, pi}; this
 specific constant still needs a wider prime basis and remains a tested, known
 miss (`test_logspace_known_miss_needs_wider_prime_basis`).
+
+## Update: a fifth finding, from a later re-scan the same day
+
+The numbers above are pinned to commit `42f92d9`. Later the same day, after
+near-miss detection, whole-sequence recognition, and several constant-table
+domain packs shipped (including exact unit conversions - inch, foot, yard -
+and their reciprocals), the same packages were re-scanned. All four findings
+above were still present, unchanged - a good consistency check. Pillow, which
+had zero candidate literals worth reporting in the original pass, now had one:
+
+5. **Pillow** `PIL/BmpImagePlugin.py:133,440` - both the BMP read and write
+   paths hardcode `39.3701` (inches per meter) instead of the exact
+   `1 / 0.0254 = 39.37007874015748`. Real production code, not a test -
+   appears symmetrically in both directions, and the source has a confirming
+   comment, `# 1 meter == 39.3701 inches`, reading like a value copied from a
+   reference table rather than computed. Pillow is one of the most-installed
+   packages on PyPI. Same caliber as the sympy finding; not yet filed upstream.
+
+This wasn't a gap in the original methodology - the inch-to-meter table entry
+this match depends on didn't exist yet at commit `42f92d9`. It's evidence the
+tool's usefulness scales with its constant table, not just a one-time result.
+
+pandas and scikit-learn were added fresh in this pass (not part of the
+original nine). Both came back clean: every finding was either a planted test
+fixture or an already-correct, full-precision recognition (pandas'
+`plotting/_matplotlib/misc.py` confidence-band constants `z95`/`z99` matched
+this tool's own z-score table entries exactly - a nice validation, not a bug).
 
 ## Reproduction
 
