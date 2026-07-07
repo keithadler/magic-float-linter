@@ -818,6 +818,51 @@ Direct-instantiation tests alone would not have caught an entry-point
 registration mistake; the subprocess test specifically would.
 244 tests, ruff + self-lint clean.
 
+### Near-miss for rationals [DONE 2026-07-07]
+**Goal:** item #10 from the original "10 things" brainstorm - near-miss/typo
+detection already existed but only applied to table-tier matches against
+curated mathematical constants (pi, e, roots). A typo'd repeating-decimal
+fraction (`0.333331` for `1/3`) was invisible to it.
+**Files:** recognize.py (one line: `_match_rational` now passes its result
+through the same `_is_near_miss` helper `_match_table` already uses),
+tests/test_near_miss.py.
+**Why it was this small:** `_is_near_miss(x, true_value, digits)` was already
+fully generic - it doesn't know or care whether `true_value` came from the
+curated table or from `_match_rational`'s continued-fraction search. No new
+gating logic was needed; the rational tier's existing confidence formula
+(`rational_surplus`, which already charges heavily for denominator size)
+governs near-miss claims exactly as it already governs plain matches.
+**A test-case pitfall worth recording:** the first attempt used
+`0.3333334` as a "typo" of 1/3 and it was *not* flagged - correctly. That
+literal sits within `_is_near_miss`'s tolerance band for the correct 7-digit
+rounding of 1/3 (differs by about half a unit in the last place), so it's
+indistinguishable from an honest short rendering, exactly as designed. A
+genuine "wrong digit" test case (`0.333331`, changing the actual last digit)
+was needed - the same pattern the existing e/pi near-miss tests already use.
+**Validated:** 20,000 random mantissas (5-12 digits) through the rational
+near-miss path: 2 hits (0.01%), both landing right at the surplus=2.0
+threshold - matching what the confidence formula predicts, not a leak. Full
+stdlib re-scan: identical 54 findings / 4 near-misses, no new noise. 250
+tests, ruff + self-lint clean.
+
+### False-positive audit against ordinary, non-scientific code [DONE 2026-07-07]
+**Goal:** every accuracy claim so far came from scanning scientific/numeric
+packages - exactly the domain the tool is tuned for, and "friendly" territory
+for a confidence gate that might be a little too permissive. The harder,
+more honest test is code that *shouldn't* have magic floats at all.
+**Method and full results:** see `docs/false-positive-audit.md`. Six large,
+widely-used, non-scientific packages (Django, Flask, requests, click,
+SQLAlchemy, pydantic) scanned in full. Five produced zero findings across
+their entire installed source. The one hit, in Django's GIS module, is a
+correct recognition of an exact conversion factor Django itself gets right
+(`"mi": 1609.344`, matching this tool's own table entry) - not a bug, not a
+false positive, the same "tool agrees with correct code" category the
+corpus study already documented for astropy and pandas.
+**What this does and doesn't prove:** confirms the gate doesn't spam ordinary
+application code; doesn't replace the separate Monte Carlo check above for
+general calibration, and six packages isn't exhaustive - a natural thing to
+repeat periodically as the table and tiers grow.
+
 ---
 
 ## Step ordering notes for the executor
