@@ -96,7 +96,7 @@ README section "Context-aware suggestions". Mark steps 1-4 DONE here.
 
 ## Phase B - configuration and suppression (steps 5-8)
 
-### Step 5: inline suppression comments
+### Step 5: inline suppression comments [DONE 2026-07-06]
 **Goal:** `# exact: ignore` on a line silences findings on that line.
 **Files:** src/exact_linter/extract.py, src/exact_linter/cli.py, tests/test_cli.py
 **How:** extract_source records for each literal whether its source line (or the

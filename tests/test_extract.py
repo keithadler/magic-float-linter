@@ -33,3 +33,30 @@ def test_extract_literals_with_context():
 
 def test_syntax_error_returns_empty():
     assert extract_source("def broken(:", Path("bad.py")) == []
+
+
+def test_trailing_comment_suppresses():
+    src = "x = 3.141592653589793  # exact: ignore\ny = 2.718281828459045\n"
+    literals = extract_source(src, Path("s.py"))
+    by_text = {lit.text: lit for lit in literals}
+    assert by_text["3.141592653589793"].suppressed is True
+    assert by_text["2.718281828459045"].suppressed is False
+
+
+def test_comment_above_suppresses():
+    src = "# exact: ignore\nx = 3.141592653589793\n"
+    literals = extract_source(src, Path("s.py"))
+    assert literals[0].suppressed is True
+
+
+def test_comment_above_does_not_leak_to_next_literal():
+    src = "# exact: ignore\nx = 3.141592653589793\ny = 2.718281828459045\n"
+    literals = extract_source(src, Path("s.py"))
+    by_text = {lit.text: lit for lit in literals}
+    assert by_text["3.141592653589793"].suppressed is True
+    assert by_text["2.718281828459045"].suppressed is False
+
+
+def test_unrelated_comment_does_not_suppress():
+    src = "x = 3.141592653589793  # just a comment\n"
+    assert extract_source(src, Path("s.py"))[0].suppressed is False

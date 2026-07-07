@@ -75,6 +75,9 @@ def main(argv: Sequence[str] | None = None) -> int:
     skipped: Counter[str] = Counter()
     for file in iter_python_files(args.paths):
         for literal in extract_file(file):
+            if literal.suppressed:
+                skipped["suppressed by comment"] += 1
+                continue
             reason = skip_reason(literal)
             if reason is not None:
                 skipped[reason] += 1
