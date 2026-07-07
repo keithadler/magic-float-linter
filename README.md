@@ -72,6 +72,28 @@ Because the metric is the *magnitude* of lost precision, it even distinguishes a
 constant from a merely short one: `2.71827` (a typo for e) scores worse than a correctly
 rounded `2.71828`. Use `--truncation-only` to hunt precision bugs specifically.
 
+## Near-miss detection (likely typos)
+
+A truncation is a *faithful* short constant - `3.14159` really is pi, just shortened.
+A **near-miss** is a *wrong* one: `2.71827` is close to e, but the last digit is
+incorrect (e rounds to `2.71828`). That is the signature of a typo or transcription
+error, and it is often a real bug:
+
+```
+$ exact --near-miss-only mycode/
+mycode/consts.py:8:9  2.71827  (EULER)  LIKELY TYPO
+    ~ e: close to it, but a written digit is wrong (not just short)
+    suggestion: math.e  (did you mean this?)
+    confidence: agrees with e to ~5 of 6 digits, then diverges
+```
+
+To keep this signal clean, near-miss detection deliberately applies only to short,
+plausibly hand-typed literals against **mathematical** constants (pi, e, roots - values
+that never change). It is not applied to full-precision literals (a value a
+unit-in-the-last-place off a constant is a rounding artifact, not a typo) nor to physical
+constants (whose CODATA revisions produce older-but-correct values that would look like
+typos of the current one).
+
 Every candidate match is gated by an **evidence score**: the digits the literal
 actually provides must comfortably exceed the complexity of the claimed expression
 plus the size of the space searched to find it. A 16-digit match on `pi/180` is
@@ -151,6 +173,7 @@ exact [paths ...]        scan files or directories (default: .)
   --format {text,json,github,sarif}   output format (default: text)
   --json                 shortcut for --format json
   --truncation-only      report only constants that also lose precision
+  --near-miss-only       report only likely typos (see below)
   --exclude-tests        skip test_*.py, *_test.py, and test(s)/ directories
   --min-surplus N        evidence threshold (default 2.0)
   --jobs N, -j N         scan files in N parallel processes (default 1)

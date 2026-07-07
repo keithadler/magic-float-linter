@@ -36,6 +36,12 @@ LOGSPACE_BASES = (2, 3, 5)
 DOUBLE_DIGITS = 15.95
 TRUNCATION_MIN_LOST = 3  # report truncation once this many digits are lost
 
+# Near-miss (typo) detection applies only to short, plausibly hand-typed
+# literals. A value written to near-full double precision that sits a
+# unit-in-the-last-place off a constant is a machine-precision artifact, not
+# a typo, so cap the digits a near-miss may have.
+NEAR_MISS_MAX_DIGITS = 12
+
 
 @dataclass(frozen=True)
 class Match:
@@ -46,10 +52,16 @@ class Match:
     matched_digits: int
     surplus: float
     precision_lost: int = 0  # digits of accuracy lost vs. the exact form
+    # a literal close to a known constant but NOT its correct rounding: a
+    # written digit is actually wrong (e.g. 2.71827 for e). Likely a typo,
+    # not an honest truncation.
+    near_miss: bool = False
 
     @property
     def truncated(self) -> bool:
-        return self.precision_lost >= TRUNCATION_MIN_LOST
+        # a near-miss is a wrong value, not a faithful-but-short one; don't
+        # also label it a truncation
+        return self.precision_lost >= TRUNCATION_MIN_LOST and not self.near_miss
 
 
 def _agrees(x: mpmath.mpf, y: mpmath.mpf, digits: int) -> bool:
@@ -68,6 +80,55 @@ def _precision_lost(x: mpmath.mpf, true_value: mpmath.mpf) -> int:
     accuracy = -mpmath.log10(rel)
     lost = DOUBLE_DIGITS - accuracy
     return max(0, int(mpmath.floor(lost + mpmath.mpf("0.5"))))
+
+
+def _sigfig_scale(v: mpmath.mpf, digits: int) -> mpmath.mpf:
+    exp = int(mpmath.floor(mpmath.log10(abs(v))))
+    return mpmath.mpf(10) ** (digits - 1 - exp)
+
+
+def _round_sigfigs(v: mpmath.mpf, digits: int) -> mpmath.mpf:
+    """v rounded to `digits` significant figures."""
+    if v == 0:
+        return mpmath.mpf(0)
+    scale = _sigfig_scale(v, digits)
+    return mpmath.nint(v * scale) / scale
+
+
+def _trunc_sigfigs(v: mpmath.mpf, digits: int) -> mpmath.mpf:
+    """v truncated (chopped toward zero) to `digits` significant figures."""
+    if v == 0:
+        return mpmath.mpf(0)
+    scale = _sigfig_scale(v, digits)
+    return mpmath.mpf(int(v * scale)) / scale
+
+
+def _is_near_miss(x: mpmath.mpf, true_value: mpmath.mpf, digits: int) -> bool:
+    """True if x is close to true_value (close enough to have matched) but is
+    a *wrong* rendering of it - a written digit is actually incorrect. That is
+    the signature of a typo or transcription error (2.71827 for e), as opposed
+    to a faithful short rendering.
+
+    A rendering is faithful if it is the constant rounded OR truncated
+    (chopped) to the digits written, or if it is simply the nearest double to
+    the constant (a full-precision literal, whose decimal repr can differ from
+    the true value's own rounding in the last place).
+
+    Only short literals qualify: a near-full-precision value a unit-in-the-
+    last-place off a constant is a machine artifact, not a typo. Callers also
+    restrict this to mathematical constants - physical constants have legit
+    historical revisions that look like typos of the current value.
+    """
+    if true_value == 0 or digits > NEAR_MISS_MAX_DIGITS:
+        return False
+    if float(x) == float(true_value):
+        return False
+    tol = abs(true_value) * mpmath.mpf(10) ** (mpmath.mpf("0.5") - digits)
+    if abs(x - _round_sigfigs(true_value, digits)) <= tol:
+        return False
+    if abs(x - _trunc_sigfigs(true_value, digits)) <= tol:
+        return False
+    return True
 
 
 def _needs_parens(suggestion: str) -> bool:
@@ -95,6 +156,7 @@ def _match_table(
                 matched_digits=digits,
                 surplus=confidence.table_surplus(digits, len(rows)),
                 precision_lost=_precision_lost(x, value),
+                near_miss=entry.decimal is None and _is_near_miss(x, value, digits),
             )
     # Reciprocal folding: a literal may be 1/entry for an entry we listed
     # only in its plain form. This extends the table's reach to every
@@ -118,6 +180,7 @@ def _match_table(
                     surplus=confidence.table_surplus(digits, len(rows))
                     - confidence.FOLD_PENALTY,
                     precision_lost=_precision_lost(x, true_value),
+                    near_miss=entry.decimal is None and _is_near_miss(x, true_value, digits),
                 )
     # Complement folding (1 - entry, e.g. exponential-saturation constants
     # like 1 - 1/e) and shift folding (entry + 1, e.g. a root shifted up by
@@ -137,6 +200,7 @@ def _match_table(
                 matched_digits=digits,
                 surplus=confidence.table_surplus(digits, len(rows)) - confidence.FOLD_PENALTY,
                 precision_lost=_precision_lost(x, true_value),
+                near_miss=entry.decimal is None and _is_near_miss(x, true_value, digits),
             )
         if _agrees(x + 1, value, digits):
             true_value = value - 1
@@ -148,6 +212,7 @@ def _match_table(
                 matched_digits=digits,
                 surplus=confidence.table_surplus(digits, len(rows)) - confidence.FOLD_PENALTY,
                 precision_lost=_precision_lost(x, true_value),
+                near_miss=entry.decimal is None and _is_near_miss(x, true_value, digits),
             )
     return None
 

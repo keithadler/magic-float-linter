@@ -52,11 +52,27 @@ def render_text(
 ) -> str:
     lines: list[str] = []
     truncated_count = 0
+    near_miss_count = 0
     for finding in findings:
         lit, match = finding.literal, finding.match
         location = f"{lit.file}:{lit.line}:{lit.col + 1}"
         context = f"  ({lit.context})" if lit.context else ""
         note = f"  [{match.note}]" if match.note else ""
+        if match.near_miss:
+            near_miss_count += 1
+            lines.append(f"{location}  {lit.text}{context}  LIKELY TYPO")
+            lines.append(
+                f"    ~ {match.form}: close to it, but a written digit is wrong"
+                f" (not just short)"
+            )
+            import_hint = f"  ({finding.import_note})" if finding.import_note else ""
+            lines.append(f"    suggestion: {finding.suggestion}{import_hint}  (did you mean this?)")
+            lines.append(
+                f"    confidence: agrees with {match.form} to"
+                f" ~{match.matched_digits - 1} of {match.matched_digits} digits, then diverges"
+            )
+            lines.append("")
+            continue
         marker = "  TRUNCATED" if match.truncated else ""
         lines.append(f"{location}  {lit.text}{context}{marker}")
         lines.append(f"    = {match.form}{note}")
@@ -82,8 +98,13 @@ def render_text(
         lines.append("")
     plural = "" if len(findings) == 1 else "s"
     summary = f"{len(findings)} recognized constant{plural} found"
+    qualifiers = []
     if truncated_count:
-        summary += f" ({truncated_count} truncated, losing precision)"
+        qualifiers.append(f"{truncated_count} truncated, losing precision")
+    if near_miss_count:
+        qualifiers.append(f"{near_miss_count} likely typo{'' if near_miss_count == 1 else 's'}")
+    if qualifiers:
+        summary += f" ({'; '.join(qualifiers)})"
     lines.append(summary + ".")
     if verbose and skipped:
         lines.append("")
@@ -99,8 +120,15 @@ def render_github(findings: list[Finding]) -> str:
     lines = []
     for finding in findings:
         lit, match = finding.literal, finding.match
-        level = "warning" if match.truncated else "notice"
-        message = f"{lit.text} is {match.form}; suggest {match.suggestion}"
+        if match.near_miss:
+            level = "warning"
+            message = (
+                f"{lit.text} is likely a typo for {match.form};"
+                f" did you mean {match.suggestion}?"
+            )
+        else:
+            level = "warning" if match.truncated else "notice"
+            message = f"{lit.text} is {match.form}; suggest {match.suggestion}"
         lines.append(f"::{level} file={lit.file},line={lit.line},col={lit.col + 1}::{message}")
     return "\n".join(lines)
 

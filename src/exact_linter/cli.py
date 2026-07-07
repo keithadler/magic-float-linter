@@ -63,6 +63,7 @@ def scan_file(
     file: Path,
     min_surplus: float,
     truncation_only: bool,
+    near_miss_only: bool = False,
     min_digits: int = MIN_DIGITS,
     extra_entries: tuple = (),
 ) -> tuple[list[Finding], dict[str, int]]:
@@ -83,6 +84,8 @@ def scan_file(
             skipped["no confident match"] += 1
         elif truncation_only and not match.truncated:
             skipped["recognized but not truncated"] += 1
+        elif near_miss_only and not match.near_miss:
+            skipped["recognized but not a near-miss"] += 1
         else:
             idiom = idiomatic(match, literal)
             display, import_note = adjust_for_imports(idiom or match.suggestion, info)
@@ -186,6 +189,11 @@ def main(argv: Sequence[str] | None = None) -> int:
         help="report only truncated constants (magic numbers that also lose precision)",
     )
     parser.add_argument(
+        "--near-miss-only",
+        action="store_true",
+        help="report only near-misses (literals that look like a typo'd known constant)",
+    )
+    parser.add_argument(
         "--exclude-tests",
         action="store_true",
         help="skip test files (test_*.py, *_test.py, or anything under a test/tests directory)",
@@ -249,6 +257,7 @@ def main(argv: Sequence[str] | None = None) -> int:
         scan_file,
         min_surplus=min_surplus,
         truncation_only=truncation_only,
+        near_miss_only=args.near_miss_only,
         min_digits=min_digits,
         extra_entries=config.constants,
     )
