@@ -47,6 +47,13 @@ def iter_python_files(paths: Sequence[str]) -> Iterator[Path]:
                     yield sub
 
 
+def is_test_file(path: Path) -> bool:
+    name = path.name
+    if name.startswith("test_") or name.endswith("_test.py"):
+        return True
+    return any(part in ("test", "tests") for part in path.parts[:-1])
+
+
 def main(argv: Sequence[str] | None = None) -> int:
     parser = argparse.ArgumentParser(
         prog="exact",
@@ -75,6 +82,11 @@ def main(argv: Sequence[str] | None = None) -> int:
         help="report only truncated constants (magic numbers that also lose precision)",
     )
     parser.add_argument(
+        "--exclude-tests",
+        action="store_true",
+        help="skip test files (test_*.py, *_test.py, or anything under a test/tests directory)",
+    )
+    parser.add_argument(
         "--exit-zero", action="store_true", help="exit 0 even when findings are reported"
     )
     parser.add_argument(
@@ -84,7 +96,11 @@ def main(argv: Sequence[str] | None = None) -> int:
 
     findings: list[Finding] = []
     skipped: Counter[str] = Counter()
+    excluded_test_files = 0
     for file in iter_python_files(args.paths):
+        if args.exclude_tests and is_test_file(file):
+            excluded_test_files += 1
+            continue
         for literal in extract_file(file):
             if literal.suppressed:
                 skipped["suppressed by comment"] += 1
@@ -111,6 +127,8 @@ def main(argv: Sequence[str] | None = None) -> int:
             print(output)
     else:
         print(render_text(findings, dict(skipped), verbose=args.verbose))
+        if args.verbose and excluded_test_files:
+            print(f"\n{excluded_test_files} test file(s) excluded (--exclude-tests).")
     return 1 if findings and not args.exit_zero else 0
 
 
