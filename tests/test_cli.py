@@ -38,6 +38,23 @@ def test_cli_json_output(tmp_path, capsys):
     assert data[0]["precision_lost"] == 0
 
 
+def test_cli_suppression_comment(tmp_path, capsys):
+    (tmp_path / "p.py").write_text(
+        "A = 3.141592653589793  # exact: ignore\nB = 3.141592653589793\n"
+    )
+    code = main([str(tmp_path)])
+    out = capsys.readouterr().out
+    assert code == 1
+    assert "1 recognized constant" in out
+
+
+def test_cli_suppression_shows_in_verbose(tmp_path, capsys):
+    (tmp_path / "p.py").write_text("A = 3.141592653589793  # exact: ignore\n")
+    main([str(tmp_path), "--exit-zero", "-v"])
+    out = capsys.readouterr().out
+    assert "suppressed by comment" in out
+
+
 def test_cli_truncation_only(tmp_path, capsys):
     (tmp_path / "p.py").write_text(
         "SHORT = 3.14159\nFULL = 3.141592653589793\n"

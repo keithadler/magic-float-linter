@@ -64,6 +64,15 @@ plus the size of the space searched to find it. A 16-digit match on `pi/180` is
 near-certain; a 6-digit match on some elaborate combination is a coincidence and is
 suppressed. Tune the gate with `--min-surplus` (default 2.0, higher = stricter).
 
+## Suppressing a finding
+
+Add a `# exact: ignore` comment on the literal's line (or on its own line directly
+above) to silence it:
+
+```python
+TOLERANCE = 3.14159  # exact: ignore
+```
+
 ## Install
 
 Not yet on PyPI. From source:
@@ -103,7 +112,7 @@ Exit code is 1 when findings are reported (flake8 convention), so it can run in 
 - Multi-language extraction via tree-sitter (JS, C, C++, Java).
 - SARIF output for GitHub code scanning.
 - Configuration via `[tool.exact]` in `pyproject.toml` (custom constants, thresholds,
-  per-path ignores) and inline `# exact: ignore` suppression.
+  per-path ignores).
 
 ## Development
 

@@ -3,10 +3,12 @@
 from __future__ import annotations
 
 import ast
+import re
 from dataclasses import dataclass, field
 from pathlib import Path
 
 _NUMERIC = (int, float)
+_SUPPRESS_RE = re.compile(r"#\s*exact:\s*ignore\b")
 
 
 @dataclass
@@ -19,6 +21,7 @@ class FloatLiteral:
     col: int
     context: str = ""  # nearest name binding (variable, keyword, default arg), if any
     sequence_size: int = field(default=0)  # numeric elements in the enclosing list/tuple/set
+    suppressed: bool = False  # silenced by a "# exact: ignore" comment
 
 
 def _context_for(node: ast.AST, parents: dict[ast.AST, ast.AST]) -> str:
@@ -67,6 +70,16 @@ def _sequence_size(node: ast.AST, parents: dict[ast.AST, ast.AST]) -> int:
     return count
 
 
+def _is_suppressed(lineno: int, lines: list[str]) -> bool:
+    """A literal is suppressed by a trailing comment on its own line, or by a
+    comment-only line directly above it."""
+    own_line = lines[lineno - 1] if 0 < lineno <= len(lines) else ""
+    if _SUPPRESS_RE.search(own_line):
+        return True
+    prev_line = lines[lineno - 2].strip() if lineno >= 2 else ""
+    return prev_line.startswith("#") and bool(_SUPPRESS_RE.search(prev_line))
+
+
 def extract_source(source: str, file: Path) -> list[FloatLiteral]:
     try:
         tree = ast.parse(source)
@@ -76,6 +89,7 @@ def extract_source(source: str, file: Path) -> list[FloatLiteral]:
     for node in ast.walk(tree):
         for child in ast.iter_child_nodes(node):
             parents[child] = node
+    lines = source.splitlines()
     literals: list[FloatLiteral] = []
     for node in ast.walk(tree):
         if isinstance(node, ast.Constant) and type(node.value) is float:
@@ -88,6 +102,7 @@ def extract_source(source: str, file: Path) -> list[FloatLiteral]:
                     col=node.col_offset,
                     context=_context_for(node, parents),
                     sequence_size=_sequence_size(node, parents),
+                    suppressed=_is_suppressed(node.lineno, lines),
                 )
             )
     return literals
