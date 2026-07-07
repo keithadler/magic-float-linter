@@ -116,6 +116,19 @@ Exit code is 1 when findings are reported (flake8 convention), so it can run in 
 - Configuration via `[tool.exact]` in `pyproject.toml` (custom constants, thresholds,
   per-path ignores).
 
+## pre-commit
+
+Add to `.pre-commit-config.yaml`:
+
+```yaml
+repos:
+  - repo: https://github.com/keithadler/magic-float-linter
+    rev: main  # pin to a tag once released
+    hooks:
+      - id: exact
+        # or: id: exact-truncation, to only flag precision-losing literals
+```
+
 ## Development
 
 ```

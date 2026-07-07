@@ -217,7 +217,7 @@ side once.
 **Accept:** twine check passes; either the package is live on PyPI or a
 release.yml exists and PLAN.md records what Keith must click in PyPI settings.
 
-### Step 15: pre-commit hook support
+### Step 15: pre-commit hook support [DONE 2026-07-06]
 **Goal:** One-line adoption in any repo using pre-commit.
 **Files:** new .pre-commit-hooks.yaml, README.md
 **How:** Standard hook definition: id "exact", entry "exact", language "python",
