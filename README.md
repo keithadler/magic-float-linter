@@ -34,8 +34,17 @@ data-like values are ignored), then run through three recognition tiers:
    `0.6666666666666666` (2/3). Terminating decimals such as `0.125` are deliberately
    ignored: they are exactly representable and almost always intentional.
 3. **PSLQ search** - the [PSLQ integer relation algorithm](https://www.davidhbailey.com/dhbpapers/pslq-comp-alg.pdf)
-   (via `mpmath.identify`) searches for combinations like `(3*pi)/4` that the table
-   does not cover.
+   (via `mpmath.identify`) searches for additive combinations like `(3*pi)/4` that
+   the table does not cover.
+4. **Log-space PSLQ** - runs PSLQ on the *logarithms* of the literal and a basis of
+   small primes {2, 3, 5} and pi, which turns an additive relation among the logs
+   back into a multiplicative one: monomials like `2**(1/3) / pi` that the additive
+   tier's search pattern doesn't express. (The basis deliberately excludes 10, since
+   `ln(10) = ln(2) + ln(5)` would make it linearly dependent on itself and PSLQ
+   would just rediscover that identity instead of anything about the literal.)
+   This tier is scoped to three small primes; recognizing something like
+   `7/8 * (4/11)**(4/3)` - a real constant found undetected in astropy's cosmology
+   module during a corpus study - would need a wider prime basis, a known limitation.
 
 The table tier also folds each entry a few extra ways so the table covers more than
 what's literally listed: **reciprocal folding** (`1/entry`, e.g. an unlisted `1/sqrt(5)`

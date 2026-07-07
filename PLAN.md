@@ -255,7 +255,7 @@ populated; README documents the code-scanning upload-sarif snippet.
 
 ## Phase F - engine improvements (steps 18-21)
 
-### Step 18: log-space tier (multiplicative relations)
+### Step 18: log-space tier (multiplicative relations) [DONE 2026-07-07]
 **Goal:** Catch monomials like 2^a * 3^b * pi^c that the additive search misses.
 **Files:** src/exact_linter/recognize.py, confidence.py, tests/test_recognize.py
 **How:** New finder _match_logspace, after _match_pslq, only for digits >= 12 and
@@ -269,6 +269,21 @@ integer_digit_cost of all exponents + 1 per base used + PSLQ_SEARCH_DIGITS + 1
 **Accept:** recognize("2.5464790894703254") (which is 8/pi) or a planted
 "0.6079271018540267" (6/pi**2) resolves; all junk tests still return None; stdlib
 scan gains no false positives (manually review any new findings).
+**Note:** basis shipped as {2, 3, 5, pi} without 10 - `ln(10) = ln(2)+ln(5)` makes
+a basis that includes it linearly dependent on itself, so PSLQ always finds that
+trivial identity instead of any real relation involving x (caught by prototyping
+before writing the real code, not by the test suite). The plan's own cited
+examples (8/pi, 6/pi**2) turned out to already be reachable via table +
+reciprocal folding (`pi/8` and `pi**2/6` are listed entries) and via the
+additive PSLQ tier's own search, so they don't actually exercise this tier;
+shipped tests use `2**(1/3)/pi` and `3**(2/5)/pi` instead, found by probing
+candidates against the real implementation. Confidence charges exponent digit
+cost + 1 (for pi, the only named factor) + LOGSPACE_SEARCH_DIGITS - not a
+separate per-factor charge, which would have made the plan's own 6/pi**2
+example fail the default surplus threshold. Stdlib scan: 0 logspace findings
+(expected - this tier targets scientific/physics code), scan time roughly
+doubled (33s -> 66s) since every 12+ digit literal surviving earlier tiers now
+runs an extra PSLQ search; a real cost for step 21 (performance) to address.
 
 ### Step 19: minimal-polynomial tier for quadratic algebraics
 **Goal:** Recognize numbers like tan(pi/8) = sqrt(2)-1 when not in the table, as
