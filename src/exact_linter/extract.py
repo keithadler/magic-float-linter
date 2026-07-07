@@ -24,6 +24,8 @@ class FloatLiteral:
     context: str = ""  # nearest name binding (variable, keyword, default arg), if any
     sequence_size: int = field(default=0)  # numeric elements in the enclosing list/tuple/set
     suppressed: bool = False  # silenced by a "# exact: ignore" comment
+    op: str = ""  # enclosing binary operation: "mul", "div-num", "div-den", "add", "sub"
+    other_operand: str = ""  # source text of the other operand, when it is a simple name
 
 
 def _context_for(node: ast.AST, parents: dict[ast.AST, ast.AST]) -> str:
@@ -78,6 +80,31 @@ def _sequence_size(node: ast.AST, parents: dict[ast.AST, ast.AST]) -> int:
     return count
 
 
+_BINOP_NAMES = {ast.Mult: "mul", ast.Add: "add", ast.Sub: "sub"}
+
+
+def _operation(
+    node: ast.AST, parents: dict[ast.AST, ast.AST], source: str
+) -> tuple[str, str]:
+    """The binary operation enclosing the literal, and the other operand's
+    source text when that operand is a simple name or attribute."""
+    parent = parents.get(node)
+    if isinstance(parent, ast.UnaryOp):  # look through a leading minus
+        node, parent = parent, parents.get(parent)
+    if not isinstance(parent, ast.BinOp):
+        return "", ""
+    if isinstance(parent.op, ast.Div):
+        op = "div-num" if parent.left is node else "div-den"
+    else:
+        op = _BINOP_NAMES.get(type(parent.op), "")
+        if not op:
+            return "", ""
+    other = parent.right if parent.left is node else parent.left
+    if isinstance(other, (ast.Name, ast.Attribute)):
+        return op, ast.get_source_segment(source, other) or ""
+    return op, ""
+
+
 def _is_suppressed(lineno: int, lines: list[str]) -> bool:
     """A literal is suppressed by a trailing comment on its own line, or by a
     comment-only line directly above it."""
@@ -102,6 +129,7 @@ def extract_source(source: str, file: Path) -> list[FloatLiteral]:
     for node in ast.walk(tree):
         if isinstance(node, ast.Constant) and type(node.value) is float:
             text = ast.get_source_segment(source, node) or repr(node.value)
+            op, other_operand = _operation(node, parents, source)
             literals.append(
                 FloatLiteral(
                     text=text.strip("()"),
@@ -111,6 +139,8 @@ def extract_source(source: str, file: Path) -> list[FloatLiteral]:
                     context=_context_for(node, parents),
                     sequence_size=_sequence_size(node, parents),
                     suppressed=_is_suppressed(node.lineno, lines),
+                    op=op,
+                    other_operand=other_operand,
                 )
             )
     return literals

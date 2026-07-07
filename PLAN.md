@@ -37,7 +37,7 @@ says it is independent. One step = one commit (or a few small commits).
 
 ## Phase A - context-aware suggestions (steps 1-4)
 
-### Step 1: capture the enclosing operation in the extractor
+### Step 1: capture the enclosing operation in the extractor [DONE 2026-07-07]
 **Goal:** FloatLiteral knows how the literal is used, so later steps can suggest
 idioms like math.radians(x).
 **Files:** src/exact_linter/extract.py, tests/test_extract.py
@@ -51,7 +51,7 @@ the literal is numerator or denominator.
 other_operand="x"; `1.0 / 2.302585092994046` on the denominator side gives
 op="div-den"; a bare assignment gives op="". All existing tests still pass.
 
-### Step 2: idiom rewrite rules
+### Step 2: idiom rewrite rules [DONE 2026-07-07]
 **Goal:** Suggestions become idiomatic when context allows.
 **Files:** new src/exact_linter/idioms.py, src/exact_linter/recognize.py (no
 changes needed if idioms is applied at the Finding level), src/exact_linter/cli.py,
