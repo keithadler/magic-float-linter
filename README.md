@@ -24,10 +24,12 @@ mycode/orbit.py:42:11  57.29577951308232  (deg_per_rad)
 Float literals are extracted from the AST, aggressively triaged (short, round, or
 data-like values are ignored), then run through three recognition tiers:
 
-1. **Table lookup** - a curated library of ~140 constants: pi and friends, logarithm
-   and decibel conversion factors, roots, angle conversions (arcseconds, gradians, the
-   golden angle), statistics constants (z-scores, the MAD-to-sigma factor, the GELU
-   coefficient), SI/CODATA physical constants, and exactly-defined unit conversions
+1. **Table lookup** - a curated library of constants: pi and friends, logarithm
+   and decibel conversion factors (including the famous "3 dB" half-power point), roots,
+   angle conversions (arcseconds, gradians, the golden angle), statistics constants
+   (z-scores, the MAD-to-sigma factor, the GELU coefficient), CIE Lab color-science
+   constants (kappa, epsilon), SI/CODATA physical constants (current and historical
+   revisions - see below), and exactly-defined unit conversions, imperial and metric
    (mapped to `scipy.constants` names). The confidence gate charges log10(table size)
    per match, so the table can grow without inflating the false-positive rate.
 2. **Rational check** - continued-fraction detection of repeating decimals like
