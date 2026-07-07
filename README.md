@@ -43,7 +43,7 @@ suppressed. Tune the gate with `--min-surplus` (default 2.0, higher = stricter).
 Not yet on PyPI. From source:
 
 ```
-git clone https://github.com/keith-apps/magic-float-linter
+git clone https://github.com/keithadler/magic-float-linter
 cd magic-float-linter
 pip install .
 ```

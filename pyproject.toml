@@ -28,7 +28,7 @@ dev = ["pytest>=8", "ruff>=0.4"]
 exact = "exact_linter.cli:main"
 
 [project.urls]
-Homepage = "https://github.com/keith-apps/magic-float-linter"
+Homepage = "https://github.com/keithadler/magic-float-linter"
 
 [tool.hatch.build.targets.wheel]
 packages = ["src/exact_linter"]
