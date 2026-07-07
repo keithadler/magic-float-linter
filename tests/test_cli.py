@@ -1,0 +1,36 @@
+import json
+
+from exact_linter.cli import main
+
+
+def test_cli_finds_planted_constant(tmp_path, capsys):
+    (tmp_path / "planted.py").write_text(
+        "RAD_PER_DEG = 0.017453292519943295\nJUNK = 0.8315463215476912\n"
+    )
+    code = main([str(tmp_path)])
+    out = capsys.readouterr().out
+    assert code == 1
+    assert "pi/180" in out
+    assert "0.8315463215476912" not in out
+
+
+def test_cli_clean_file_exits_zero(tmp_path, capsys):
+    (tmp_path / "clean.py").write_text("x = 1\ny = 0.5\n")
+    assert main([str(tmp_path)]) == 0
+    assert "0 recognized constants" in capsys.readouterr().out
+
+
+def test_cli_exit_zero_flag(tmp_path, capsys):
+    (tmp_path / "p.py").write_text("K = 1.4426950408889634\n")
+    assert main([str(tmp_path), "--exit-zero"]) == 0
+
+
+def test_cli_json_output(tmp_path, capsys):
+    (tmp_path / "p.py").write_text("K = 1.4426950408889634\n")
+    code = main([str(tmp_path / "p.py"), "--json"])
+    data = json.loads(capsys.readouterr().out)
+    assert code == 1
+    assert len(data) == 1
+    assert data[0]["form"] == "1/ln(2)"
+    assert data[0]["context"] == "K"
+    assert data[0]["line"] == 1

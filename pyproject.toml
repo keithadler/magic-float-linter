@@ -1,0 +1,41 @@
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[project]
+name = "exact-linter"
+version = "0.1.0"
+description = "Finds magic float constants in Python code (pi/180, 1/ln 2, 2/3, ...) and suggests exact, readable replacements."
+readme = "README.md"
+license = { text = "MIT" }
+authors = [{ name = "Keith Adler" }]
+requires-python = ">=3.10"
+dependencies = ["mpmath>=1.3.0"]
+keywords = ["linter", "constants", "pslq", "static-analysis", "floating-point"]
+classifiers = [
+    "Development Status :: 3 - Alpha",
+    "Environment :: Console",
+    "Intended Audience :: Developers",
+    "License :: OSI Approved :: MIT License",
+    "Programming Language :: Python :: 3",
+    "Topic :: Software Development :: Quality Assurance",
+]
+
+[project.optional-dependencies]
+dev = ["pytest>=8", "ruff>=0.4"]
+
+[project.scripts]
+exact = "exact_linter.cli:main"
+
+[project.urls]
+Homepage = "https://github.com/keith-apps/magic-float-linter"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/exact_linter"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+
+[tool.ruff]
+line-length = 100
+target-version = "py310"
