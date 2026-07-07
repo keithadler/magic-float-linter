@@ -44,6 +44,45 @@ short one).
 test_random.py and nothing else; numpy near-misses 4->0 and astropy 6->0 after the
 two gates. 131 tests, ruff + self-lint clean.
 
+### Widen log-space prime basis to {2,3,5,7,11} [DONE 2026-07-07]
+**Goal:** close the documented astropy neutrino-correction miss
+(`test_logspace_known_miss_needs_wider_prime_basis`), which needed primes 7
+and 11 outside the {2,3,5} basis.
+**Validated before shipping:** re-ran the same random-number false-positive
+sweep used to evaluate step 19, at digits 10-14 with the wider basis -
+0/3000+ trials pass the confidence gate at every digit count, so no charge
+increase was needed for the larger search space.
+**Real bug found along the way:** `_match_logspace` unconditionally bailed
+out whenever the PSLQ relation had zero pi-coefficient, on the assumption
+that meant "x is a plain rational, the rational tier's job." That's wrong
+whenever the coefficient on ln(x) doesn't evenly divide the other
+exponents - x is then an irrational root of a rational (e.g. a cube root)
+that the rational tier could never find. Fixed to only bail when every
+resulting exponent is an integer (x truly is an exact rational). This
+fix has payoff independent of the basis widening: it recovered two real
+stdlib literals using only the original {2,3,5} basis (CPython's own
+`cbrt(1.2) == 2**(1/3)*3**(1/3)*5**(-1/3)` and `exp2(2.3) == 2**(23/10)`
+in test_math.py), both previously blocked by the same flaw.
+**Also lowered LOGSPACE_MIN_DIGITS 12->11** (re-validated at 0/3000 FPs) so
+the astropy literal (11 significant digits as written) is eligible at all.
+**Honest result on the motivating example itself:** the astropy literal
+now resolves to `2**(-1/3)*7*11**(-4/3)`, correctly - but at only 11 given
+digits, describing a 3-factor relation needs more evidence than the
+default confidence gate allows (surplus -2.0), so `recognize()` still
+returns None on it at default settings. It resolves with `--min-surplus`
+lowered. This is the confidence system working as designed - the original
+PLAN.md note describing this as "a known, deliberate limitation" was
+right for the wrong reason (missing primes) and is now right for the
+correct reason (insufficient digits for the relation's complexity).
+**New false-positive class noticed (not fixed, narrow, noted for later):**
+near-miss detection can flag a deliberately nudged test-tolerance bound
+(e.g. `assert d < 1.233700551`, one ULP above pi**2/8's correct rounding,
+intentionally to absorb floating-point noise) as a "likely typo." Found in
+sympy's test_lambdify.py during corpus re-validation. Rare, test-file-only,
+not chased further in this pass.
+**Stdlib re-scan:** 52->54 findings (the two logspace recoveries above),
+zero new false positives; 4 likely typos unchanged; full suite 132 tests.
+
 ## Ground rules for every step
 
 1. Run `.venv/bin/python -m pytest -q` and `.venv/bin/ruff check .` before every
