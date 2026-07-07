@@ -120,7 +120,7 @@ pip install .
 
 ```
 exact [paths ...]        scan files or directories (default: .)
-  --format {text,json,github}   output format (default: text)
+  --format {text,json,github,sarif}   output format (default: text)
   --json                 shortcut for --format json
   --truncation-only      report only constants that also lose precision
   --exclude-tests        skip test_*.py, *_test.py, and test(s)/ directories
@@ -131,6 +131,17 @@ exact [paths ...]        scan files or directories (default: .)
 ```
 
 Exit code is 1 when findings are reported (flake8 convention), so it can run in CI.
+
+For GitHub code scanning, emit SARIF and upload it:
+
+```yaml
+- run: exact src/ --format sarif --exit-zero > exact.sarif
+- uses: github/codeql-action/upload-sarif@v3
+  with:
+    sarif_file: exact.sarif
+```
+
+Truncated constants arrive as warnings; plain recognitions as notes.
 
 `--format github` prints [GitHub Actions workflow commands](https://docs.github.com/en/actions/using-workflows/workflow-commands-for-github-actions),
 so findings appear as inline annotations on a PR's Files Changed tab with no

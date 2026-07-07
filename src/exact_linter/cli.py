@@ -109,9 +109,12 @@ def main(argv: Sequence[str] | None = None) -> int:
     parser.add_argument("paths", nargs="*", default=["."], help="files or directories to scan")
     parser.add_argument(
         "--format",
-        choices=["text", "json", "github"],
+        choices=["text", "json", "github", "sarif"],
         default="text",
-        help="output format: text, json, or github (workflow-command annotations)",
+        help=(
+            "output format: text, json, github (workflow-command annotations),"
+            " or sarif (GitHub code scanning)"
+        ),
     )
     parser.add_argument("--json", action="store_true", help="shortcut for --format json")
     parser.add_argument(
@@ -197,6 +200,10 @@ def main(argv: Sequence[str] | None = None) -> int:
     output_format = "json" if args.json else args.format
     if output_format == "json":
         print(render_json(findings))
+    elif output_format == "sarif":
+        from .sarif import render_sarif
+
+        print(render_sarif(findings))
     elif output_format == "github":
         output = render_github(findings)
         if output:

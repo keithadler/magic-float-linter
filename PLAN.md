@@ -243,7 +243,7 @@ runs and reports findings.
 
 ## Phase E - output formats (steps 16-17)
 
-### Step 16: SARIF output
+### Step 16: SARIF output [DONE 2026-07-07]
 **Goal:** GitHub code scanning integration.
 **Files:** new src/exact_linter/sarif.py, cli.py, tests/test_sarif.py, README.md
 **How:** `--format sarif` (refactor --json into `--format json` keeping --json as
