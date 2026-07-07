@@ -415,18 +415,43 @@ flags anything in src/, fix the source or add `# exact: ignore` with a comment
 why. Add the standard actions workflow badge to the README top.
 **Accept:** CI green including the self-lint step; badge renders.
 
-### Step 14: PyPI release 0.2.0
+### Step 14: PyPI release 0.2.0 [PREPPED 2026-07-07, blocked on Keith for the actual publish]
 **Goal:** `pip install exact-linter` works.
-**Files:** pyproject.toml (version bump to 0.2.0), new CHANGELOG.md
-**How:** Write CHANGELOG.md summarizing 0.1.0 -> 0.2.0 (phases A-C). Build with
-`.venv/bin/pip install build twine && .venv/bin/python -m build` then
-`.venv/bin/twine check dist/*`. Publishing requires Keith's PyPI token - STOP and
-ask Keith to either run `twine upload dist/*` himself or provide a token. Prefer
-setting up Trusted Publishing (PyPI -> GitHub OIDC) with a release.yml workflow
-triggered on GitHub release creation, which needs Keith to configure the PyPI
-side once.
-**Accept:** twine check passes; either the package is live on PyPI or a
-release.yml exists and PLAN.md records what Keith must click in PyPI settings.
+**Done:** CHANGELOG.md written (0.1.0 -> 0.2.0, everything shipped this
+session). Version bumped to 0.2.0 in both pyproject.toml and
+`exact_linter/__init__.py.__version__` (a test - tests/test_version.py -
+now keeps these in sync so they can't silently drift apart again, which is
+exactly what happened: both hardcoded "0.1.0" independently with nothing
+checking them against each other). Built with `python -m build`,
+`twine check dist/*` passes on both the wheel and sdist. End-to-end smoke
+test: installed the built wheel (not editable) into a fresh venv, ran
+`exact identify` and `exact --help` for real - works.
+
+`.github/workflows/release.yml` added: builds on every GitHub Release
+publish event, then publishes via PyPI Trusted Publishing (OIDC token,
+`pypa/gh-action-pypi-publish@release/v1`) - no PyPI token stored as a
+GitHub secret, ever.
+
+**What Keith needs to do - the only remaining step, and it's a few
+clicks, not a token to hand over:**
+1. Go to https://pypi.org/manage/account/publishing/ (must be logged into
+   the PyPI account that will own this project - a *new* project can
+   register a "pending publisher" before it exists on PyPI at all).
+2. Add a pending publisher with exactly:
+   - PyPI project name: `exact-linter`
+   - Owner: `keithadler`
+   - Repository name: `magic-float-linter`
+   - Workflow filename: `release.yml`
+   - Environment name: `pypi` (matches the `environment: pypi` in the
+     publish job - GitHub auto-creates the environment on first run;
+     protection rules can be added later in repo Settings > Environments
+     if desired, but aren't required for this to work).
+3. To actually publish: create a GitHub Release (any tag, e.g. `v0.2.0`) -
+   that's the trigger. The workflow builds and uploads automatically.
+**Accept:** twine check passes (done); either the package is live on PyPI or
+a release.yml exists and PLAN.md records what Keith must click in PyPI
+settings (done - see above). Publishing itself is a "create a GitHub
+Release" action away, once the pending publisher is registered.
 
 ### Step 15: pre-commit hook support [DONE 2026-07-06]
 **Goal:** One-line adoption in any repo using pre-commit.
