@@ -2,22 +2,40 @@
 
 [![CI](https://github.com/keithadler/magic-float-linter/actions/workflows/ci.yml/badge.svg)](https://github.com/keithadler/magic-float-linter/actions/workflows/ci.yml)
 
-**A linter that recognizes magic float constants and tells you what they really are.**
+**A linter that finds hardcoded numbers that are secretly exact mathematical
+constants - typed by hand, and typed wrong.**
 
-Codebases are full of literals like `0.017453292519943295`, `1.4426950408889634`, and
-`0.3989422804014327`. Those are `pi/180`, `1/ln(2)`, and `1/sqrt(2*pi)` - but nothing in
-the code says so. `exact` scans Python source, recognizes these constants, and suggests
-exact, readable replacements.
+Here's a real one. [sympy](https://github.com/sympy/sympy) - one of the
+most-downloaded packages on PyPI - has this in its AutoLev parser:
+
+```python
+# sympy/parsing/autolev/_listener_autolev_antlr.py
+factor = 0.0174533   # someone typed pi/180 from memory
+```
+
+That line is supposed to be the degrees-to-radians conversion, `pi/180`. It's
+accurate to 6 digits instead of the 16 a Python float actually holds - a real,
+silent ~4x10⁻⁷ error, sitting in a widely-used library. `exact` finds it:
 
 ```
-$ exact mycode/
-mycode/orbit.py:42:11  57.29577951308232  (deg_per_rad)
-    = 180/pi  [use math.degrees(x) to convert radians to degrees]
-    suggestion: 180 / math.pi
-    confidence: matches all 16 given digits, surplus 13.9
+$ exact sympy/
+sympy/parsing/autolev/_listener_autolev_antlr.py:1167:21  0.0174533  TRUNCATED
+    = pi/180  [use math.radians(x) to convert degrees to radians]
+    suggestion: math.pi / 180
+    precision: accurate to only 6 digits; the exact form recovers ~10 lost digits
+    confidence: matches all 6 given digits, surplus 3.8
 
-1 recognized constant found.
+1 recognized constant found (1 truncated, losing precision).
 ```
+
+**This is never a deliberate trade-off.** A Python float literal is parsed once,
+at compile time, into the same 64-bit double regardless of how many digits are
+in the source - `0.0174533` and `math.pi / 180` cost exactly the same at
+runtime. Shortening a constant's digits never buys speed; it only throws away
+accuracy for free. Every truncated constant `exact` finds is someone typing
+a value from memory or a reference table, not an engineering choice.
+
+Run it the same way on your own code: `exact mycode/`.
 
 ## How it works
 
@@ -350,9 +368,9 @@ code-scanning setup required. Truncated constants are `::warning`, others are
 
 ## Does it work on real code?
 
-See [the corpus study](docs/corpus-study.md): nine popular scientific Python
-packages, 911 recognized constants, and three verified upstream precision bugs -
-sympy's AutoLev parser converting degrees with a 6-digit `0.0174533`,
+The sympy bug above isn't a one-off. See [the corpus study](docs/corpus-study.md):
+nine popular scientific Python packages, 911 recognized constants, and three
+verified upstream precision bugs total - sympy's AutoLev conversion,
 scikit-image writing the CIE Lab threshold `6/29` as `0.2068966`, and
 statsmodels' tricube kernel constant `70/81` as `0.864197530864`. On
 scikit-image the signal-to-noise is exactly right: 1064 float literals in,
