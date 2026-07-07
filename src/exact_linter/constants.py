@@ -259,6 +259,57 @@ PHYSICAL_ENTRIES: tuple[ConstantEntry, ...] = (
     ),
 )
 
+# Superseded-but-was-correct CODATA values. The 2019 SI redefinition made k,
+# N_A, h, and e exact and changed the recommended values of everything
+# derived from them; earlier revisions are not typos or truncations of the
+# current value, they were the measured best estimate at the time. Recognized
+# explicitly (rather than left as "no confident match") so old code can be
+# told what it's carrying without being accused of a bug: the suggestion
+# points at today's value for anyone who wants to modernize deliberately,
+# never applied automatically (--fix only rewrites bit-identical matches, and
+# these aren't - the whole point is that they differ from the current value).
+# Confirmed present verbatim in astropy's codata2010.py during the corpus
+# study, real values from real widely-used code, not invented examples.
+HISTORICAL_PHYSICAL_ENTRIES: tuple[ConstantEntry, ...] = (
+    ConstantEntry(
+        "vacuum permittivity (CODATA 2010/2014)",
+        "scipy.constants.epsilon_0",
+        "superseded; current CODATA value is 8.8541878128e-12",
+        "8.854187817e-12",
+    ),
+    ConstantEntry(
+        "gas constant R (CODATA 2010)",
+        "scipy.constants.R",
+        "superseded; current CODATA value is 8.31446261815324"
+        " (exact since 2019, k and N_A are now both exact)",
+        "8.3144621",
+    ),
+    ConstantEntry(
+        "Bohr radius (CODATA 2010)",
+        'scipy.constants.physical_constants["Bohr radius"][0]',
+        "superseded; current CODATA value is 5.29177210903e-11",
+        "5.2917721092e-11",
+    ),
+    ConstantEntry(
+        "fine-structure constant (CODATA 2010)",
+        "scipy.constants.fine_structure",
+        "superseded; current CODATA value is 0.0072973525693",
+        "7.2973525698e-3",
+    ),
+    ConstantEntry(
+        "Stefan-Boltzmann sigma (CODATA 2010)",
+        "scipy.constants.sigma",
+        "superseded; current CODATA value is 5.670374419e-8",
+        "5.670373e-8",
+    ),
+    ConstantEntry(
+        "Wien displacement constant (CODATA 2010)",
+        "scipy.constants.Wien",
+        "superseded; current CODATA value is 2.897771955e-3",
+        "2.8977721e-3",
+    ),
+)
+
 _NAMESPACE_NAMES = (
     "pi",
     "e",
@@ -294,7 +345,7 @@ def table(
         for entry in MATH_ENTRIES:
             value = mpmath.mpf(eval(entry.form, {"__builtins__": {}}, namespace))
             rows.append((value, entry))
-        for entry in PHYSICAL_ENTRIES + extra:
+        for entry in PHYSICAL_ENTRIES + HISTORICAL_PHYSICAL_ENTRIES + extra:
             if entry.decimal is not None:
                 rows.append((mpmath.mpf(entry.decimal), entry))
     return tuple(rows)

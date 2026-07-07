@@ -103,6 +103,41 @@ logspace example to prove --min-surplus is wired through), plus a regression
 test that normal path-scanning still works unaffected. 142 tests total, ruff
 clean, manually smoke-tested the real CLI output for tone/formatting.
 
+### Historical (superseded-but-correct) physical constants [DONE 2026-07-07]
+**Goal:** recognize old-but-legitimate CODATA values explicitly (the gas
+constant, vacuum permittivity, fine-structure constant, Bohr radius,
+Stefan-Boltzmann sigma, Wien displacement constant, all CODATA-2010) instead
+of leaving them as silent misses or - worse - misdiagnosing them as
+truncated, which they aren't: they're the correct recommended value for
+that revision. Real values confirmed present verbatim in astropy's
+codata2010.py/codata2014.py during the corpus study, not invented examples.
+**Files:** constants.py (HISTORICAL_PHYSICAL_ENTRIES, folded into table()),
+tests/test_historical_constants.py.
+**How:** plain decimal-only ConstantEntry rows, no new Match field and no
+recognize.py/confidence.py changes needed for the feature itself - the
+existing `entry.decimal is not None` guard already excludes physical
+constants from near-miss detection (built for exactly this reason), and
+since the literal equals the historical value exactly, precision_lost is 0
+so it's never flagged truncated either. Each entry's note states the
+current value and points the suggestion at it, for anyone modernizing
+deliberately; --fix never applies it automatically since it isn't
+bit-identical.
+**Real bug found and fixed along the way:** `_match_table` returned the
+FIRST agreeing entry in table order, not the closest one. The historical
+and current values of a constant can each fall within the other's matching
+tolerance at low digit counts (e.g. CODATA-2010's R and CODATA-2018's R
+differ by only 6e-8 relative, within an 8-digit literal's tolerance
+window), so table order silently decided which one a literal "was" -
+before this fix, every historical literal resolved to the generic current
+entry, truncated=True, with none of the historical context. Fixed by
+scanning all agreeing entries and keeping the one closest to the literal.
+**Validated:** all six historical values resolve correctly with
+truncated=near_miss=False; the corresponding current-era values (verified
+directly against astropy's codata2018.py/codata2022.py) still resolve to
+their plain, non-historical form; full stdlib scan unchanged at 54
+findings (order-of-match fix caused zero regressions there). 147 tests,
+ruff + self-lint clean.
+
 ## Ground rules for every step
 
 1. Run `.venv/bin/python -m pytest -q` and `.venv/bin/ruff check .` before every
