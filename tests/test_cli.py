@@ -112,6 +112,46 @@ def test_recognize_cache_shares_results():
     assert a is b  # cached: identical calls share one (frozen) Match
 
 
+def test_import_aware_bare_name(tmp_path, capsys):
+    (tmp_path / "p.py").write_text("from math import pi\nX = 3.141592653589793\n")
+    main([str(tmp_path), "--exit-zero"])
+    out = capsys.readouterr().out
+    assert "suggestion: pi\n" in out
+    assert "math.pi" not in out
+    assert "add: import" not in out
+
+
+def test_import_aware_missing_math_import(tmp_path, capsys):
+    (tmp_path / "p.py").write_text("X = 3.141592653589793\n")
+    main([str(tmp_path), "--exit-zero"])
+    out = capsys.readouterr().out
+    assert "suggestion: math.pi  (add: import math)" in out
+
+
+def test_import_aware_existing_math_import(tmp_path, capsys):
+    (tmp_path / "p.py").write_text("import math\nX = 3.141592653589793\n")
+    main([str(tmp_path), "--exit-zero"])
+    out = capsys.readouterr().out
+    assert "suggestion: math.pi\n" in out
+    assert "add: import" not in out
+
+
+def test_import_aware_scipy_submodule_note(tmp_path, capsys):
+    (tmp_path / "p.py").write_text("K_B = 1.380649e-23\n")
+    main([str(tmp_path), "--exit-zero"])
+    out = capsys.readouterr().out
+    assert "(add: import scipy.constants)" in out
+
+
+def test_import_aware_applies_to_idiom(tmp_path, capsys):
+    (tmp_path / "p.py").write_text(
+        "from math import radians\nrad = deg * 0.017453292519943295\n"
+    )
+    main([str(tmp_path), "--exit-zero"])
+    out = capsys.readouterr().out
+    assert "suggestion: radians(deg)" in out
+
+
 def test_cli_github_format(tmp_path, capsys):
     (tmp_path / "p.py").write_text("SHORT = 3.14159\nFULL = 1.4426950408889634\n")
     code = main([str(tmp_path), "--format", "github"])

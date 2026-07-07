@@ -14,6 +14,15 @@ _SUPPRESS_RE = re.compile(r"#\s*exact:\s*ignore\b")
 
 
 @dataclass
+class FileInfo:
+    """Literals plus the import context suggestions should be rendered in."""
+
+    literals: list[FloatLiteral]
+    math_names: frozenset[str] = frozenset()  # from math import <name>, ...
+    modules: frozenset[str] = frozenset()  # top-level modules imported
+
+
+@dataclass
 class FloatLiteral:
     """A float literal as it appears in source, before any interpretation."""
 
@@ -152,3 +161,36 @@ def extract_file(path: Path) -> list[FloatLiteral]:
     except OSError:
         return []
     return extract_source(source, path)
+
+
+def _collect_imports(tree: ast.AST) -> tuple[frozenset[str], frozenset[str]]:
+    math_names: set[str] = set()
+    modules: set[str] = set()
+    for node in ast.walk(tree):
+        if isinstance(node, ast.Import):
+            for alias in node.names:
+                modules.add(alias.name.split(".")[0])
+        elif isinstance(node, ast.ImportFrom) and node.module:
+            modules.add(node.module.split(".")[0])
+            if node.module == "math":
+                math_names.update(alias.name for alias in node.names)
+    return frozenset(math_names), frozenset(modules)
+
+
+def extract_source_info(source: str, file: Path) -> FileInfo:
+    """Like extract_source, but also reports the file's import context."""
+    literals = extract_source(source, file)
+    try:
+        tree = ast.parse(source)
+    except (SyntaxError, ValueError):
+        return FileInfo(literals)
+    math_names, modules = _collect_imports(tree)
+    return FileInfo(literals, math_names=math_names, modules=modules)
+
+
+def extract_file_info(path: Path) -> FileInfo:
+    try:
+        source = path.read_text(encoding="utf-8", errors="replace")
+    except OSError:
+        return FileInfo([])
+    return extract_source_info(source, path)
