@@ -91,6 +91,27 @@ def test_cli_include_tests_by_default(tmp_path, capsys):
     assert "1 recognized constant" in capsys.readouterr().out
 
 
+def test_cli_jobs_output_identical(tmp_path, capsys):
+    for i in range(6):
+        (tmp_path / f"mod{i}.py").write_text(
+            f"RAD{i} = 0.017453292519943295\nK{i} = 1.4426950408889634\nJ{i} = 0.831546{i}\n"
+        )
+    main([str(tmp_path), "--exit-zero", "--json"])
+    serial = capsys.readouterr().out
+    main([str(tmp_path), "--exit-zero", "--json", "--jobs", "2"])
+    parallel = capsys.readouterr().out
+    assert serial == parallel
+    assert len(json.loads(serial)) == 12
+
+
+def test_recognize_cache_shares_results():
+    from exact_linter.recognize import recognize
+
+    a = recognize("0.017453292519943295")
+    b = recognize("0.017453292519943295")
+    assert a is b  # cached: identical calls share one (frozen) Match
+
+
 def test_cli_github_format(tmp_path, capsys):
     (tmp_path / "p.py").write_text("SHORT = 3.14159\nFULL = 1.4426950408889634\n")
     code = main([str(tmp_path), "--format", "github"])

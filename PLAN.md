@@ -313,7 +313,7 @@ the 4x wider search: direct, reciprocal, complement, shift).
 recognize("0.6321205588285577") (1 - 1/e, exponential saturation) resolves via
 complement fold. Junk tests still pass. Stdlib scan reviewed.
 
-### Step 21: performance pass
+### Step 21: performance pass [DONE 2026-07-07]
 **Goal:** Big-corpus scans get fast; establish a benchmark.
 **Files:** src/exact_linter/recognize.py, cli.py, new tests/test_perf.py (marked
 slow/skip by default), README.md
@@ -325,6 +325,17 @@ first, recognize each unique text once, then fan results back out to locations.
 after and record both numbers in the commit message.
 **Accept:** Stdlib scan wall time improves (record it); results identical to
 pre-change scan output (diff the two outputs).
+**Note:** stdlib benchmark: 45.5s baseline -> 42.5s serial with lru_cache ->
+25.1s with --jobs 8 (outputs byte-identical in all cases, verified by diff).
+The (b) explicit dedupe step was unnecessary - the lru_cache makes repeated
+literals free automatically, so no separate fan-out machinery was written.
+Match became a frozen dataclass since cached results are shared between
+callers. Parallel CPU tops out around 200% even with 8 workers because one or
+two very large files dominate the tail; that's an honest limit of file-level
+parallelism, and chunksize=1 (not the plan's "files chunks") is what load
+balancing wants here since per-file cost is wildly uneven. No separate
+test_perf.py - the equivalence test (serial vs --jobs 2, identical JSON) runs
+fast and lives in test_cli.py.
 
 ## Phase G - multi-language (steps 22-24)
 

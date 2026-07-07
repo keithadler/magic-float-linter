@@ -106,6 +106,7 @@ exact [paths ...]        scan files or directories (default: .)
   --truncation-only      report only constants that also lose precision
   --exclude-tests        skip test_*.py, *_test.py, and test(s)/ directories
   --min-surplus N        evidence threshold (default 2.0)
+  --jobs N, -j N         scan files in N parallel processes (default 1)
   --exit-zero            always exit 0, even with findings
   -v, --verbose          show counts of skipped literals
 ```

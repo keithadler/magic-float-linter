@@ -6,6 +6,8 @@ import argparse
 import sys
 from collections import Counter
 from collections.abc import Iterator, Sequence
+from concurrent.futures import ProcessPoolExecutor
+from functools import partial
 from pathlib import Path
 
 from .confidence import DEFAULT_MIN_SURPLUS
@@ -54,6 +56,30 @@ def is_test_file(path: Path) -> bool:
     return any(part in ("test", "tests") for part in path.parts[:-1])
 
 
+def scan_file(
+    file: Path, min_surplus: float, truncation_only: bool
+) -> tuple[list[Finding], dict[str, int]]:
+    """Scan one file; top-level so ProcessPoolExecutor can pickle it."""
+    findings: list[Finding] = []
+    skipped: Counter[str] = Counter()
+    for literal in extract_file(file):
+        if literal.suppressed:
+            skipped["suppressed by comment"] += 1
+            continue
+        reason = skip_reason(literal)
+        if reason is not None:
+            skipped[reason] += 1
+            continue
+        match = recognize(literal.text, min_surplus=min_surplus)
+        if match is None:
+            skipped["no confident match"] += 1
+        elif truncation_only and not match.truncated:
+            skipped["recognized but not truncated"] += 1
+        else:
+            findings.append(Finding(literal, match))
+    return findings, dict(skipped)
+
+
 def main(argv: Sequence[str] | None = None) -> int:
     parser = argparse.ArgumentParser(
         prog="exact",
@@ -90,32 +116,43 @@ def main(argv: Sequence[str] | None = None) -> int:
         "--exit-zero", action="store_true", help="exit 0 even when findings are reported"
     )
     parser.add_argument(
+        "--jobs",
+        "-j",
+        type=int,
+        default=1,
+        help="scan files in N parallel processes (default: 1)",
+    )
+    parser.add_argument(
         "-v", "--verbose", action="store_true", help="show counts of skipped literals"
     )
     args = parser.parse_args(argv)
 
-    findings: list[Finding] = []
-    skipped: Counter[str] = Counter()
+    files: list[Path] = []
     excluded_test_files = 0
     for file in iter_python_files(args.paths):
         if args.exclude_tests and is_test_file(file):
             excluded_test_files += 1
-            continue
-        for literal in extract_file(file):
-            if literal.suppressed:
-                skipped["suppressed by comment"] += 1
-                continue
-            reason = skip_reason(literal)
-            if reason is not None:
-                skipped[reason] += 1
-                continue
-            match = recognize(literal.text, min_surplus=args.min_surplus)
-            if match is None:
-                skipped["no confident match"] += 1
-            elif args.truncation_only and not match.truncated:
-                skipped["recognized but not truncated"] += 1
-            else:
-                findings.append(Finding(literal, match))
+        else:
+            files.append(file)
+
+    worker = partial(
+        scan_file, min_surplus=args.min_surplus, truncation_only=args.truncation_only
+    )
+    findings: list[Finding] = []
+    skipped: Counter[str] = Counter()
+    if args.jobs > 1:
+        with ProcessPoolExecutor(max_workers=args.jobs) as pool:
+            # chunksize=1: scan cost is dominated by a few large files, so
+            # batching files into chunks starves workers at the tail
+            results = pool.map(worker, files, chunksize=1)
+            for file_findings, file_skipped in results:
+                findings.extend(file_findings)
+                skipped.update(file_skipped)
+    else:
+        for file in files:
+            file_findings, file_skipped = worker(file)
+            findings.extend(file_findings)
+            skipped.update(file_skipped)
 
     findings.sort(key=lambda f: (str(f.literal.file), f.literal.line, f.literal.col))
     output_format = "json" if args.json else args.format
