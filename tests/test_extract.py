@@ -60,3 +60,29 @@ def test_comment_above_does_not_leak_to_next_literal():
 def test_unrelated_comment_does_not_suppress():
     src = "x = 3.141592653589793  # just a comment\n"
     assert extract_source(src, Path("s.py"))[0].suppressed is False
+
+
+def test_list_of_short_tuples_is_nested_data():
+    # matplotlib-style colormap table: a list of 3-element RGB triples.
+    # Each inner tuple is short (3 < the plain sequence threshold) but the
+    # whole thing is clearly a data table, not a handful of constants.
+    src = "_Blues_data = [\n    [0.96862745098039216, 0.98431372549019602, 1.0],\n    [0.87058823529411766, 0.92156862745098034, 0.96862745098039216],\n]\n"
+    literals = extract_source(src, Path("cm.py"))
+    by_text = {lit.text: lit for lit in literals}
+    assert by_text["0.96862745098039216"].sequence_size > 3
+
+
+def test_dict_of_tuples_is_nested_data():
+    # named-color-table style: dict mapping name -> RGB tuple
+    src = "COLORS = {'aliceblue': (0.941, 0.973, 1.0), 'azure': (0.941, 1.0, 1.0)}\n"
+    literals = extract_source(src, Path("colors.py"))
+    assert all(lit.sequence_size > 3 for lit in literals)
+
+
+def test_standalone_short_tuple_is_not_nested_data():
+    # a plain coordinate pair, not nested in another container, should be
+    # unaffected by the nested-container rule: sequence_size is just the
+    # element count (2), nowhere near the nested-data sentinel
+    src = "point = (3.14159265358979, 2.71828182845905)\n"
+    literals = extract_source(src, Path("s.py"))
+    assert all(lit.sequence_size == 2 for lit in literals)
