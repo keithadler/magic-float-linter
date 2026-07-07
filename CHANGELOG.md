@@ -68,6 +68,17 @@ all grew substantially; this is effectively the tool's first "real" release.
   config, `--select`/`--ignore` composition, and `# exact: ignore[code]`
   suppression as the standalone CLI. Sequence findings are out of scope for
   the plugin - they don't fit flake8's single-location diagnostic model.
+- **Near-miss for rationals**: typo detection now also applies to
+  repeating-decimal fractions, not just named constants - `0.333331` reads
+  as a typo'd `1/3` the same way `2.71827` reads as a typo'd `e`.
+
+### Validated
+
+- **False-positive audit against ordinary code**: six large, non-scientific
+  packages (Django, Flask, requests, click, SQLAlchemy, pydantic) scanned in
+  full. Five produced zero findings; the one hit (Django's GIS module) is a
+  correct recognition of an exact conversion factor, not a bug. See
+  `docs/false-positive-audit.md`.
 
 ### Fixed
 

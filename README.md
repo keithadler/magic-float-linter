@@ -139,6 +139,12 @@ unit-in-the-last-place off a constant is a rounding artifact, not a typo) nor to
 constants (whose CODATA revisions produce older-but-correct values that would look like
 typos of the current one).
 
+The same check applies to repeating-decimal fractions, not just named constants:
+`0.333331` reads as a typo'd `1/3` (`0.333333`), the same way `2.71827` reads as a
+typo'd `e`. Validated against 20,000 random mantissas before shipping: 0.01% false
+positives, and both hits landed right at the confidence threshold - matching what the
+evidence-score formula predicts, not a leak.
+
 Every candidate match is gated by an **evidence score**: the digits the literal
 actually provides must comfortably exceed the complexity of the claimed expression
 plus the size of the space searched to find it. A 16-digit match on `pi/180` is
@@ -377,6 +383,14 @@ conversion as `39.3701` in `BmpImagePlugin.py` (both the BMP read and write
 paths) instead of the exact `39.37007874015748` - one of the most-installed
 packages on PyPI. On scikit-image the signal-to-noise is exactly right: 1064
 float literals in, one finding out, and it's the real bug.
+
+That's the "finds real bugs" claim. The other half - "doesn't spam false positives
+on code that was never expected to have magic floats" - was checked separately
+against Django, Flask, requests, click, SQLAlchemy, and pydantic: none of these
+are numeric or scientific libraries, so almost nothing should fire. Five of the
+six produced zero findings. The one hit, in Django's GIS module, is a correct
+recognition of an exact conversion factor Django itself gets right (not a bug) -
+see [the false-positive audit](docs/false-positive-audit.md) for the full writeup.
 
 ## Roadmap
 

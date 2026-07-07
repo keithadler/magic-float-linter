@@ -268,6 +268,7 @@ def _match_rational(x: mpmath.mpf, digits: int) -> Match | None:
         matched_digits=digits,
         surplus=confidence.rational_surplus(digits, frac.numerator, frac.denominator),
         precision_lost=_precision_lost(x, true_value),
+        near_miss=_is_near_miss(x, true_value, digits),
     )
 
 
