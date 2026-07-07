@@ -11,7 +11,7 @@ from pathlib import Path
 from .confidence import DEFAULT_MIN_SURPLUS
 from .extract import extract_file
 from .recognize import recognize
-from .report import Finding, render_json, render_text
+from .report import Finding, render_github, render_json, render_text
 from .triage import skip_reason
 
 EXCLUDED_DIRS = {
@@ -51,7 +51,13 @@ def main(argv: Sequence[str] | None = None) -> int:
         ),
     )
     parser.add_argument("paths", nargs="*", default=["."], help="files or directories to scan")
-    parser.add_argument("--json", action="store_true", help="emit findings as JSON")
+    parser.add_argument(
+        "--format",
+        choices=["text", "json", "github"],
+        default="text",
+        help="output format: text, json, or github (workflow-command annotations)",
+    )
+    parser.add_argument("--json", action="store_true", help="shortcut for --format json")
     parser.add_argument(
         "--min-surplus",
         type=float,
@@ -91,8 +97,13 @@ def main(argv: Sequence[str] | None = None) -> int:
                 findings.append(Finding(literal, match))
 
     findings.sort(key=lambda f: (str(f.literal.file), f.literal.line, f.literal.col))
-    if args.json:
+    output_format = "json" if args.json else args.format
+    if output_format == "json":
         print(render_json(findings))
+    elif output_format == "github":
+        output = render_github(findings)
+        if output:
+            print(output)
     else:
         print(render_text(findings, dict(skipped), verbose=args.verbose))
     return 1 if findings and not args.exit_zero else 0

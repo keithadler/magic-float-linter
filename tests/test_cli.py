@@ -38,6 +38,37 @@ def test_cli_json_output(tmp_path, capsys):
     assert data[0]["precision_lost"] == 0
 
 
+def test_cli_github_format(tmp_path, capsys):
+    (tmp_path / "p.py").write_text("SHORT = 3.14159\nFULL = 1.4426950408889634\n")
+    code = main([str(tmp_path), "--format", "github"])
+    out = capsys.readouterr().out
+    assert code == 1
+    lines = [line for line in out.splitlines() if line]
+    assert len(lines) == 2
+    truncated_line = next(line for line in lines if "3.14159" in line)
+    assert truncated_line.startswith("::warning file=")
+    assert "is pi; suggest math.pi" in truncated_line
+    full_line = next(line for line in lines if "1.4426950408889634" in line)
+    assert full_line.startswith("::notice file=")
+
+
+def test_cli_github_format_no_findings(tmp_path, capsys):
+    (tmp_path / "p.py").write_text("x = 1\n")
+    code = main([str(tmp_path), "--format", "github"])
+    assert code == 0
+    assert capsys.readouterr().out == ""
+
+
+def test_cli_json_flag_is_format_json_shortcut(tmp_path, capsys):
+    (tmp_path / "p.py").write_text("K = 1.4426950408889634\n")
+    out_json = main([str(tmp_path / "p.py"), "--json"])
+    data_via_flag = capsys.readouterr().out
+    out_format = main([str(tmp_path / "p.py"), "--format", "json"])
+    data_via_format = capsys.readouterr().out
+    assert out_json == out_format == 1
+    assert data_via_flag == data_via_format
+
+
 def test_cli_suppression_comment(tmp_path, capsys):
     (tmp_path / "p.py").write_text(
         "A = 3.141592653589793  # exact: ignore\nB = 3.141592653589793\n"
