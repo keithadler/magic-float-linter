@@ -147,6 +147,23 @@ Add `--diff` to preview either as a unified diff without writing. Every edit is
 located from the re-parsed AST and verified against the source before it is
 applied; anything that does not verify is skipped, never guessed at.
 
+## Identifying a single number
+
+`exact identify <number>` explains one value directly - the Inverse Symbolic
+Calculator, as a terminal command, for whatever number you're staring at right
+now instead of one buried in a file:
+
+```
+$ exact identify 0.2068966
+0.2068966 = 6/29 - truncated
+  suggestion: 6 / 29
+  note: repeating decimal
+  precision: accurate to only 7 digits; the exact form recovers ~9 lost digits
+  confidence: matches all 7 given digits, surplus 2.0
+```
+
+Takes `--min-surplus` and `--json` like the main scan.
+
 ## Suppressing a finding
 
 Add a `# exact: ignore` comment on the literal's line (or on its own line directly

@@ -83,6 +83,26 @@ not chased further in this pass.
 **Stdlib re-scan:** 52->54 findings (the two logspace recoveries above),
 zero new false positives; 4 likely typos unchanged; full suite 132 tests.
 
+### `exact identify <number>` one-shot explain mode [DONE 2026-07-07]
+**Goal:** the daily-driver UX unlock - point the tool at one number instead
+of a file. The Inverse Symbolic Calculator, as a CLI subcommand, reusing the
+existing recognize() engine directly (no scanning, no triage).
+**Files:** cli.py (_run_identify, dispatch in main() on argv[0]=="identify"),
+tests/test_identify.py, README.md.
+**How:** intercepted argv[0] == "identify" at the top of main() before the
+main scanning argparse.ArgumentParser is built, dispatching to a small
+dedicated parser/handler - avoided argparse subparsers to keep 100% backward
+compatibility with the existing scan-mode flag surface. Supports --min-surplus
+and --json; negative numbers work out of the box (argparse's built-in
+negative-number heuristic applies since no single-dash numeric-like options
+are registered on this subparser). Added a discoverability line to the main
+`--help` text.
+**Validated:** 10 new tests (recognized/full-precision/near-miss/no-match/
+negative/non-numeric/json/threshold-crossing cases, using the real astropy
+logspace example to prove --min-surplus is wired through), plus a regression
+test that normal path-scanning still works unaffected. 142 tests total, ruff
+clean, manually smoke-tested the real CLI output for tone/formatting.
+
 ## Ground rules for every step
 
 1. Run `.venv/bin/python -m pytest -q` and `.venv/bin/ruff check .` before every
