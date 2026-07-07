@@ -8,6 +8,8 @@ from dataclasses import dataclass, field
 from pathlib import Path
 
 _NUMERIC = (int, float)
+_CONTAINERS = (ast.List, ast.Tuple, ast.Set, ast.Dict)
+_NESTED_SEQUENCE_SIZE = 1_000_000  # sentinel: always over the data-sequence threshold
 _SUPPRESS_RE = re.compile(r"#\s*exact:\s*ignore\b")
 
 
@@ -61,6 +63,12 @@ def _sequence_size(node: ast.AST, parents: dict[ast.AST, ast.AST]) -> int:
         node, parent = parent, parents.get(parent)
     if not isinstance(parent, (ast.List, ast.Tuple, ast.Set)):
         return 0
+    # A short tuple/list nested inside another container (a list of RGB
+    # triples, a dict of coordinate pairs) is a data table entry even though
+    # it's short itself - e.g. matplotlib's colormap tables are lists of
+    # 3-element lists, well under the plain short-sequence threshold alone.
+    if isinstance(parents.get(parent), _CONTAINERS):
+        return _NESTED_SEQUENCE_SIZE
     count = 0
     for elt in parent.elts:
         if isinstance(elt, ast.UnaryOp):
