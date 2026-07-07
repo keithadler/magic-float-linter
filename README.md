@@ -309,13 +309,21 @@ EULER = 2.71827                 # exact: ignore[near-miss]        (only the typo
 
 ## Install
 
-Not yet on PyPI. From source:
+Directly from GitHub (works today, no clone needed):
 
 ```
-git clone https://github.com/keithadler/magic-float-linter
-cd magic-float-linter
-pip install .
+pip install "git+https://github.com/keithadler/magic-float-linter"
 ```
+
+Or with [pipx](https://pipx.pypa.io/) to get the `exact` command on its own:
+
+```
+pipx install "git+https://github.com/keithadler/magic-float-linter"
+```
+
+A PyPI release (`pip install exact-linter`) is prepared and coming; until then
+the GitHub URL above is the canonical install. From a local clone, `pip install .`
+works the same way.
 
 ## Usage
 
@@ -413,11 +421,51 @@ six produced zero findings. The one hit, in Django's GIS module, is a correct
 recognition of an exact conversion factor Django itself gets right (not a bug) -
 see [the false-positive audit](docs/false-positive-audit.md) for the full writeup.
 
+The scan was later pushed into AI/ML code - [torch, transformers, jax, xgboost,
+keras, onnx and more](docs/ai-ml-corpus-study.md). Two more genuine, verified
+truncations turned up: Hugging Face Transformers hardcoding `1/ln(2)` as
+`1.442695041` in the TimesFM and VideoPrism attention math (eight locations,
+confirmed still live on `main`), and ONNX's reference classifier writing
+`sqrt(2)` as `1.41421356`. Both are real and both are honestly *low-impact* -
+the error sits far below float32's own precision - which the write-up says
+plainly rather than dressing them up.
+
 Underneath both of those sits the confidence-surplus formula itself, checked
 directly rather than just through its effects: [42,000 random literals](docs/confidence-calibration.md),
 and the empirical false-positive rate came in below the formula's own prediction
 at every threshold tested - including a close, honest look at every hit that
 landed anywhere near the default gate.
+
+## Scope and limitations
+
+To set expectations honestly, before you run it:
+
+- **It finds one specific thing:** decimal literals that are secretly exact
+  math or physics constants, typed by hand - and, among those, the ones typed
+  short (truncated) or wrong (near-miss). That's the whole job.
+- **It is not a severity ranker.** A truncation is a fact about precision, not a
+  measure of harm. Most truncations found in the wild are harmless - the error
+  is often far below the working precision of the surrounding computation. The
+  tool reports the precision fact; deciding whether it *matters* is yours. The
+  one place it clearly mattered (sympy) is the exception that motivated the
+  tool, not the rule.
+- **"Recognized" is not "wrong."** Naming a full-precision `math.pi/180` written
+  as a decimal is a readability suggestion, not a bug report. Only `truncated`
+  and `near-miss` point at possible defects.
+- **Some truncations are correct-as-written.** A constant that faithfully
+  reproduces an external standard - a frozen CODATA revision, a bit-for-bit port
+  of a reference algorithm like SGP4 - should *not* be "fixed," because
+  faithfulness to the spec outranks mathematical exactness. The tool recognizes
+  these; a human has to supply the context. See the
+  [false-positive audit](docs/false-positive-audit.md) for worked examples.
+- **It lives where constants are hand-typed:** scientific, numerical, graphics,
+  and ML code. On ordinary application code, crypto, and infrastructure it is -
+  correctly - almost entirely silent. Scanned across ~40 packages, it produced
+  two consequential-enough findings, a handful of low-impact ones, and no
+  false alarms on non-numerical code.
+- **Python only, for now** (multi-language extraction is on the roadmap), and
+  it reads *literals in source* - not values computed at runtime, loaded from
+  data, or produced by a fit.
 
 ## Roadmap
 
