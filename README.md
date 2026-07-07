@@ -1,5 +1,7 @@
 # exact
 
+[![CI](https://github.com/keithadler/magic-float-linter/actions/workflows/ci.yml/badge.svg)](https://github.com/keithadler/magic-float-linter/actions/workflows/ci.yml)
+
 **A linter that recognizes magic float constants and tells you what they really are.**
 
 Codebases are full of literals like `0.017453292519943295`, `1.4426950408889634`, and
