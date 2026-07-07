@@ -169,6 +169,20 @@ one finding out, and it's the real bug.
 - Configuration via `[tool.exact]` in `pyproject.toml` (custom constants, thresholds,
   per-path ignores).
 
+## Configuration
+
+Settings live in `pyproject.toml` under `[tool.exact]` (discovered by walking up
+from the scanned path; CLI flags always win over config):
+
+```toml
+[tool.exact]
+min_surplus = 2.0        # evidence threshold (higher = stricter)
+min_digits = 6           # ignore literals with fewer significant digits
+exclude = ["generated/*", "vendored/*"]   # fnmatch globs
+truncation_only = false
+exclude_tests = false
+```
+
 ## pre-commit
 
 Add to `.pre-commit-config.yaml`:

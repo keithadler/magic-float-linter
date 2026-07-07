@@ -23,7 +23,7 @@ def significant_digits(text: str) -> int:
     return len(mantissa)
 
 
-def skip_reason(lit: FloatLiteral) -> str | None:
+def skip_reason(lit: FloatLiteral, min_digits: int = MIN_DIGITS) -> str | None:
     """Return why this literal should be skipped, or None if it is a candidate."""
     try:
         value = float(lit.text)
@@ -33,8 +33,8 @@ def skip_reason(lit: FloatLiteral) -> str | None:
         return "non-finite"
     if value == 0:
         return "zero"
-    if significant_digits(lit.text) < MIN_DIGITS:
-        return f"fewer than {MIN_DIGITS} significant digits"
+    if significant_digits(lit.text) < min_digits:
+        return f"fewer than {min_digits} significant digits"
     if abs(value) < MAX_SMALL_INTEGRAL and value == int(value):
         return "small integral value"
     if lit.sequence_size > MAX_DATA_SEQUENCE:

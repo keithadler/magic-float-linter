@@ -7,15 +7,17 @@ import sys
 from collections import Counter
 from collections.abc import Iterator, Sequence
 from concurrent.futures import ProcessPoolExecutor
+from fnmatch import fnmatch
 from functools import partial
 from pathlib import Path
 
 from .confidence import DEFAULT_MIN_SURPLUS
+from .config import load_config
 from .extract import extract_file_info
 from .idioms import idiomatic
 from .recognize import recognize
 from .report import Finding, adjust_for_imports, render_github, render_json, render_text
-from .triage import skip_reason
+from .triage import MIN_DIGITS, skip_reason
 
 EXCLUDED_DIRS = {
     ".git",
@@ -58,7 +60,7 @@ def is_test_file(path: Path) -> bool:
 
 
 def scan_file(
-    file: Path, min_surplus: float, truncation_only: bool
+    file: Path, min_surplus: float, truncation_only: bool, min_digits: int = MIN_DIGITS
 ) -> tuple[list[Finding], dict[str, int]]:
     """Scan one file; top-level so ProcessPoolExecutor can pickle it."""
     findings: list[Finding] = []
@@ -68,7 +70,7 @@ def scan_file(
         if literal.suppressed:
             skipped["suppressed by comment"] += 1
             continue
-        reason = skip_reason(literal)
+        reason = skip_reason(literal, min_digits=min_digits)
         if reason is not None:
             skipped[reason] += 1
             continue
@@ -111,8 +113,8 @@ def main(argv: Sequence[str] | None = None) -> int:
     parser.add_argument(
         "--min-surplus",
         type=float,
-        default=DEFAULT_MIN_SURPLUS,
-        help="evidence surplus required to report a match (default: %(default)s)",
+        default=None,
+        help=f"evidence surplus required to report a match (default: {DEFAULT_MIN_SURPLUS})",
     )
     parser.add_argument(
         "--truncation-only",
@@ -139,16 +141,36 @@ def main(argv: Sequence[str] | None = None) -> int:
     )
     args = parser.parse_args(argv)
 
+    # CLI flags override [tool.exact] in pyproject.toml; config overrides defaults
+    config = load_config(Path(args.paths[0]))
+    min_surplus = (
+        args.min_surplus
+        if args.min_surplus is not None
+        else (config.min_surplus if config.min_surplus is not None else DEFAULT_MIN_SURPLUS)
+    )
+    min_digits = config.min_digits if config.min_digits is not None else MIN_DIGITS
+    truncation_only = args.truncation_only or config.truncation_only
+    exclude_tests = args.exclude_tests or config.exclude_tests
+
     files: list[Path] = []
     excluded_test_files = 0
+    excluded_by_pattern = 0
     for file in iter_python_files(args.paths):
-        if args.exclude_tests and is_test_file(file):
+        if exclude_tests and is_test_file(file):
             excluded_test_files += 1
+        elif any(
+            fnmatch(file.as_posix(), pat) or fnmatch(file.as_posix(), f"*/{pat}")
+            for pat in config.exclude
+        ):
+            excluded_by_pattern += 1
         else:
             files.append(file)
 
     worker = partial(
-        scan_file, min_surplus=args.min_surplus, truncation_only=args.truncation_only
+        scan_file,
+        min_surplus=min_surplus,
+        truncation_only=truncation_only,
+        min_digits=min_digits,
     )
     findings: list[Finding] = []
     skipped: Counter[str] = Counter()
@@ -178,6 +200,8 @@ def main(argv: Sequence[str] | None = None) -> int:
         print(render_text(findings, dict(skipped), verbose=args.verbose))
         if args.verbose and excluded_test_files:
             print(f"\n{excluded_test_files} test file(s) excluded (--exclude-tests).")
+        if args.verbose and excluded_by_pattern:
+            print(f"{excluded_by_pattern} file(s) excluded by [tool.exact] exclude patterns.")
     return 1 if findings and not args.exit_zero else 0
 
 
