@@ -1,0 +1,14 @@
+- id: exact
+  name: exact
+  description: Recognize magic float constants and suggest exact, readable replacements.
+  entry: exact
+  language: python
+  types: [python]
+
+- id: exact-truncation
+  name: exact (truncation only)
+  description: Flag magic float constants that also lose precision vs. their exact form.
+  entry: exact
+  args: [--truncation-only]
+  language: python
+  types: [python]
