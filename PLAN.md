@@ -196,7 +196,7 @@ Use ubuntu-latest. Trigger on push to main and pull_request.
 all versions. Fix any 3.10/3.11 incompatibilities found (the code targets 3.10+;
 watch for tomllib in step 6 - conditional import).
 
-### Step 13: self-lint and badge
+### Step 13: self-lint and badge [DONE 2026-07-06]
 **Goal:** exact runs clean on its own source; advertise CI status.
 **Files:** .github/workflows/ci.yml, README.md, possibly test files
 **How:** Add CI step `exact src/ --exclude-tests` (exit code enforces it). If it
