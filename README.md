@@ -78,6 +78,25 @@ plus the size of the space searched to find it. A 16-digit match on `pi/180` is
 near-certain; a 6-digit match on some elaborate combination is a coincidence and is
 suppressed. Tune the gate with `--min-surplus` (default 2.0, higher = stricter).
 
+## Context-aware suggestions
+
+When the literal sits inside an expression the AST can read, `exact` suggests the
+idiomatic rewrite of the whole expression, not just the constant - and it adjusts
+for the file's imports (`from math import pi` makes suggestions say `pi`; a missing
+import gets an "add: import" note):
+
+```
+$ exact geo.py
+geo.py:2:18  0.017453292519943295
+    = pi/180  [use math.radians(x) to convert degrees to radians]
+    suggestion: math.radians(deg)  (add: import math)  (replaces the whole expression; the constant alone is math.pi / 180)
+```
+
+Idiom rules are limited to exact algebraic identities. `x * 0.017453...` *is*
+`math.radians(x)` for every x, so that rewrite is safe; but `x * 1.442695...`
+(x times 1/ln 2) is `log2(e**x)`, not `log2(x)`, so no log idiom fires - the
+constant's note gives the hint and leaves the judgment to the human.
+
 ## Suppressing a finding
 
 Add a `# exact: ignore` comment on the literal's line (or on its own line directly

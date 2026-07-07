@@ -11,10 +11,10 @@ from functools import partial
 from pathlib import Path
 
 from .confidence import DEFAULT_MIN_SURPLUS
-from .extract import extract_file
+from .extract import extract_file_info
 from .idioms import idiomatic
 from .recognize import recognize
-from .report import Finding, render_github, render_json, render_text
+from .report import Finding, adjust_for_imports, render_github, render_json, render_text
 from .triage import skip_reason
 
 EXCLUDED_DIRS = {
@@ -63,7 +63,8 @@ def scan_file(
     """Scan one file; top-level so ProcessPoolExecutor can pickle it."""
     findings: list[Finding] = []
     skipped: Counter[str] = Counter()
-    for literal in extract_file(file):
+    info = extract_file_info(file)
+    for literal in info.literals:
         if literal.suppressed:
             skipped["suppressed by comment"] += 1
             continue
@@ -77,7 +78,17 @@ def scan_file(
         elif truncation_only and not match.truncated:
             skipped["recognized but not truncated"] += 1
         else:
-            findings.append(Finding(literal, match, idiomatic=idiomatic(match, literal)))
+            idiom = idiomatic(match, literal)
+            display, import_note = adjust_for_imports(idiom or match.suggestion, info)
+            findings.append(
+                Finding(
+                    literal,
+                    match,
+                    idiomatic=display if idiom else None,
+                    display_suggestion="" if idiom else display,
+                    import_note=import_note,
+                )
+            )
     return findings, dict(skipped)
 
 

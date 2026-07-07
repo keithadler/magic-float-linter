@@ -71,7 +71,7 @@ the plain one in parentheses.
 **Accept:** Test file with `rad = deg * 0.017453292519943295` produces suggestion
 `math.radians(deg)`. JSON output contains both suggestion fields.
 
-### Step 3: import-aware suggestion rendering
+### Step 3: import-aware suggestion rendering [DONE 2026-07-07]
 **Goal:** Do not tell people to write math.pi when they already did
 `from math import pi`.
 **Files:** src/exact_linter/extract.py (collect imports per file),
@@ -86,13 +86,23 @@ name (e.g. pi) is in math_names, rewrite "math.pi" -> "pi" in the suggestion.
 **Accept:** Test: file with `from math import pi` and literal 3.141592653589793
 suggests `pi`, not `math.pi`. File with no imports notes "add: import math".
 
-### Step 4: stdlib spot-check and README for Phase A
+### Step 4: stdlib spot-check and README for Phase A [DONE 2026-07-07]
 **Goal:** Prove Phase A on real code, document it.
 **Files:** README.md, PLAN.md
 **How:** Run the stdlib scan, confirm idiomatic suggestions appear where expected
 (turtle.py and random.py are likely candidates), paste one real example into the
 README section "Context-aware suggestions". Mark steps 1-4 DONE here.
 **Accept:** README shows a real captured example. Scan finding count unchanged.
+**Note:** finding count unchanged (52) and zero idioms fired in the stdlib -
+its findings are bare assignments and test fixtures, and the nine-package
+scientific corpus also inlines no `name * 0.0174...` expressions (real
+libraries name their conversion constants, e.g. erfa's DR2D). The plan's
+guess that turtle.py/random.py would exercise idioms was wrong. Idioms are
+verified by unit tests and the README example is real tool output on a demo
+file; the import-aware rendering, by contrast, applies to every finding.
+Step 3's FileInfo carries `modules` (all top-level imports) rather than the
+planned has_math/has_numpy booleans, which lets the "add: import" note name
+scipy submodules (scipy.constants) properly.
 
 ## Phase B - configuration and suppression (steps 5-8)
 

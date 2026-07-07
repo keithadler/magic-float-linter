@@ -3,9 +3,10 @@
 from __future__ import annotations
 
 import json
+import re
 from dataclasses import asdict, dataclass
 
-from .extract import FloatLiteral
+from .extract import FileInfo, FloatLiteral
 from .recognize import Match
 
 
@@ -16,6 +17,32 @@ class Finding:
     # idiomatic rewrite of the literal's whole enclosing expression
     # (e.g. "math.radians(deg)"), when a context rule applies
     idiomatic: str | None = None
+    # match.suggestion rewritten for the file's imports ("" = use as-is)
+    display_suggestion: str = ""
+    # e.g. "add: import math" when the suggestion needs an absent import
+    import_note: str = ""
+
+    @property
+    def suggestion(self) -> str:
+        return self.idiomatic or self.display_suggestion or self.match.suggestion
+
+
+def adjust_for_imports(suggestion: str, info: FileInfo) -> tuple[str, str]:
+    """Rewrite a suggestion for the file's imports and say what's missing.
+
+    `from math import pi` makes "math.pi" render as "pi"; a suggestion that
+    still references a module the file never imports gets an "add: import"
+    note so the fix is copy-pasteable.
+    """
+    out = suggestion
+    for name in info.math_names:
+        out = re.sub(rf"\bmath\.{re.escape(name)}\b", name, out)
+    missing = []
+    for module in sorted(set(re.findall(r"\b(math|numpy|scipy\.\w+)(?=\.)", out))):
+        if module.split(".")[0] not in info.modules:
+            missing.append(module)
+    note = f"add: import {', '.join(missing)}" if missing else ""
+    return out, note
 
 
 def render_text(
@@ -33,14 +60,15 @@ def render_text(
         marker = "  TRUNCATED" if match.truncated else ""
         lines.append(f"{location}  {lit.text}{context}{marker}")
         lines.append(f"    = {match.form}{note}")
+        import_hint = f"  ({finding.import_note})" if finding.import_note else ""
         if finding.idiomatic:
             lines.append(
-                f"    suggestion: {finding.idiomatic}"
+                f"    suggestion: {finding.idiomatic}{import_hint}"
                 f"  (replaces the whole expression; the constant alone is"
                 f" {match.suggestion})"
             )
         else:
-            lines.append(f"    suggestion: {match.suggestion}")
+            lines.append(f"    suggestion: {finding.suggestion}{import_hint}")
         if match.truncated:
             truncated_count += 1
             lines.append(
@@ -83,6 +111,8 @@ def render_json(findings: list[Finding]) -> str:
         item = asdict(finding.match)
         item["truncated"] = finding.match.truncated
         item["idiomatic"] = finding.idiomatic
+        item["display_suggestion"] = finding.suggestion
+        item["import_note"] = finding.import_note
         item.update(
             file=str(finding.literal.file),
             line=finding.literal.line,
