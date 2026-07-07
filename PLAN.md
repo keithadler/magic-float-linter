@@ -185,7 +185,7 @@ asserting everything still parses.
 
 ## Phase D - CI, packaging, publishing (steps 12-15)
 
-### Step 12: GitHub Actions CI
+### Step 12: GitHub Actions CI [DONE 2026-07-06]
 **Goal:** Tests and lint on every push/PR.
 **Files:** new .github/workflows/ci.yml
 **How:** Matrix on python-version [3.10, 3.11, 3.12, 3.13, 3.14], steps:
