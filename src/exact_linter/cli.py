@@ -20,7 +20,15 @@ from .extract import extract_file_info
 from .gitutil import changed_lines, line_is_changed
 from .idioms import idiomatic
 from .recognize import recognize
-from .report import Finding, adjust_for_imports, render_github, render_json, render_text
+from .report import (
+    Finding,
+    SequenceFinding,
+    adjust_for_imports,
+    render_github,
+    render_json,
+    render_text,
+)
+from .sequences import MIN_SEQUENCE_LENGTH, identify_sequence
 from .triage import MIN_DIGITS, skip_reason
 
 EXCLUDED_DIRS = {
@@ -70,7 +78,8 @@ def scan_file(
     near_miss_only: bool = False,
     min_digits: int = MIN_DIGITS,
     extra_entries: tuple = (),
-) -> tuple[list[Finding], dict[str, int]]:
+    find_sequences: bool = True,
+) -> tuple[list[Finding], list[SequenceFinding], dict[str, int]]:
     """Scan one file; top-level so ProcessPoolExecutor can pickle it."""
     findings: list[Finding] = []
     skipped: Counter[str] = Counter()
@@ -102,7 +111,19 @@ def scan_file(
                     import_note=import_note,
                 )
             )
-    return findings, dict(skipped)
+
+    sequence_findings: list[SequenceFinding] = []
+    # sequences are purely informational (see cli.main): skip the search
+    # entirely under modes that are specifically about individual literals
+    if find_sequences and not (truncation_only or near_miss_only):
+        for seq in info.sequences:
+            if len(seq.elements) < MIN_SEQUENCE_LENGTH:
+                continue
+            seq_match = identify_sequence(seq, min_surplus)
+            if seq_match is not None:
+                sequence_findings.append(SequenceFinding(seq, seq_match))
+
+    return findings, sequence_findings, dict(skipped)
 
 
 def _run_fixes(findings: list[Finding], fix_truncated: bool, diff: bool) -> int:
@@ -301,6 +322,14 @@ def main(argv: Sequence[str] | None = None) -> int:
         help="write current findings to --baseline instead of reporting them",
     )
     parser.add_argument(
+        "--no-sequences",
+        action="store_true",
+        help=(
+            "skip whole-sequence recognition (e.g. Runge-Kutta weight vectors)."
+            " Sequence findings are informational: they never affect the exit code"
+        ),
+    )
+    parser.add_argument(
         "--exit-zero", action="store_true", help="exit 0 even when findings are reported"
     )
     parser.add_argument(
@@ -353,24 +382,29 @@ def main(argv: Sequence[str] | None = None) -> int:
         near_miss_only=args.near_miss_only,
         min_digits=min_digits,
         extra_entries=config.constants,
+        find_sequences=not args.no_sequences,
     )
     findings: list[Finding] = []
+    sequence_findings: list[SequenceFinding] = []
     skipped: Counter[str] = Counter()
     if args.jobs > 1:
         with ProcessPoolExecutor(max_workers=args.jobs) as pool:
             # chunksize=1: scan cost is dominated by a few large files, so
             # batching files into chunks starves workers at the tail
             results = pool.map(worker, files, chunksize=1)
-            for file_findings, file_skipped in results:
+            for file_findings, file_sequence_findings, file_skipped in results:
                 findings.extend(file_findings)
+                sequence_findings.extend(file_sequence_findings)
                 skipped.update(file_skipped)
     else:
         for file in files:
-            file_findings, file_skipped = worker(file)
+            file_findings, file_sequence_findings, file_skipped = worker(file)
             findings.extend(file_findings)
+            sequence_findings.extend(file_sequence_findings)
             skipped.update(file_skipped)
 
     findings.sort(key=lambda f: (str(f.literal.file), f.literal.line, f.literal.col))
+    sequence_findings.sort(key=lambda f: (str(f.sequence.file), f.sequence.line, f.sequence.col))
 
     # the directory --changed-only and --baseline resolve paths relative to:
     # the scanned path, not the process's cwd, which differ whenever exact is
@@ -396,6 +430,11 @@ def main(argv: Sequence[str] | None = None) -> int:
             else:
                 excluded_unchanged += 1
         findings = kept
+        sequence_findings = [
+            sf
+            for sf in sequence_findings
+            if line_is_changed(changed, sf.sequence.file, sf.sequence.line)
+        ]
 
     excluded_baselined = 0
     if args.update_baseline:
@@ -417,17 +456,21 @@ def main(argv: Sequence[str] | None = None) -> int:
 
     output_format = "json" if args.json else args.format
     if output_format == "json":
-        print(render_json(findings))
+        print(render_json(findings, sequence_findings))
     elif output_format == "sarif":
         from .sarif import render_sarif
 
-        print(render_sarif(findings))
+        print(render_sarif(findings, sequence_findings))
     elif output_format == "github":
-        output = render_github(findings)
+        output = render_github(findings, sequence_findings)
         if output:
             print(output)
     else:
-        print(render_text(findings, dict(skipped), verbose=args.verbose))
+        print(
+            render_text(
+                findings, dict(skipped), verbose=args.verbose, sequence_findings=sequence_findings
+            )
+        )
         if args.verbose and excluded_test_files:
             print(f"\n{excluded_test_files} test file(s) excluded (--exclude-tests).")
         if args.verbose and excluded_by_pattern:

@@ -15,7 +15,7 @@ def test_sarif_output_structure(tmp_path, capsys):
     run = doc["runs"][0]
     assert run["tool"]["driver"]["name"] == "exact"
     rule_ids = {rule["id"] for rule in run["tool"]["driver"]["rules"]}
-    assert rule_ids == {"recognized-constant", "truncated-constant"}
+    assert rule_ids == {"recognized-constant", "truncated-constant", "recognized-sequence"}
 
     results = run["results"]
     assert len(results) == 2

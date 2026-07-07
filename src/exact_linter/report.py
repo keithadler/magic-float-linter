@@ -6,8 +6,15 @@ import json
 import re
 from dataclasses import asdict, dataclass
 
-from .extract import FileInfo, FloatLiteral
+from .extract import FileInfo, FloatLiteral, NumericSequence
 from .recognize import Match
+from .sequences import SequenceMatch
+
+
+@dataclass
+class SequenceFinding:
+    sequence: NumericSequence
+    match: SequenceMatch
 
 
 @dataclass
@@ -49,6 +56,7 @@ def render_text(
     findings: list[Finding],
     skipped: dict[str, int] | None = None,
     verbose: bool = False,
+    sequence_findings: list[SequenceFinding] | None = None,
 ) -> str:
     lines: list[str] = []
     truncated_count = 0
@@ -106,6 +114,21 @@ def render_text(
     if qualifiers:
         summary += f" ({'; '.join(qualifiers)})"
     lines.append(summary + ".")
+    if sequence_findings:
+        lines.append("")
+        plural = "" if len(sequence_findings) == 1 else "s"
+        lines.append(
+            f"{len(sequence_findings)} exact sequence{plural} found"
+            " (informational - not counted toward pass/fail):"
+        )
+        lines.append("")
+        for sf in sequence_findings:
+            seq, match = sf.sequence, sf.match
+            location = f"{seq.file}:{seq.line}:{seq.col + 1}"
+            lines.append(f"{location}  [{', '.join(seq.elements)}]")
+            lines.append(f"    = {match.name}")
+            lines.append(f"    suggestion: {match.suggestion}")
+            lines.append("")
     if verbose and skipped:
         lines.append("")
         lines.append("skipped literals:")
@@ -114,7 +137,9 @@ def render_text(
     return "\n".join(lines)
 
 
-def render_github(findings: list[Finding]) -> str:
+def render_github(
+    findings: list[Finding], sequence_findings: list[SequenceFinding] | None = None
+) -> str:
     """Render as GitHub Actions workflow commands, so findings show up as
     inline PR annotations without any code-scanning setup."""
     lines = []
@@ -130,11 +155,17 @@ def render_github(findings: list[Finding]) -> str:
             level = "warning" if match.truncated else "notice"
             message = f"{lit.text} is {match.form}; suggest {match.suggestion}"
         lines.append(f"::{level} file={lit.file},line={lit.line},col={lit.col + 1}::{message}")
+    for sf in sequence_findings or ():
+        seq, match = sf.sequence, sf.match
+        message = f"this sequence is {match.name}; suggest {match.suggestion}"
+        lines.append(f"::notice file={seq.file},line={seq.line},col={seq.col + 1}::{message}")
     return "\n".join(lines)
 
 
-def render_json(findings: list[Finding]) -> str:
-    payload = []
+def render_json(
+    findings: list[Finding], sequence_findings: list[SequenceFinding] | None = None
+) -> str:
+    payload = {"findings": [], "sequences": []}
     for finding in findings:
         item = asdict(finding.match)
         item["truncated"] = finding.match.truncated
@@ -148,5 +179,16 @@ def render_json(findings: list[Finding]) -> str:
             literal=finding.literal.text,
             context=finding.literal.context,
         )
-        payload.append(item)
+        payload["findings"].append(item)
+    for sf in sequence_findings or ():
+        payload["sequences"].append(
+            {
+                "file": str(sf.sequence.file),
+                "line": sf.sequence.line,
+                "col": sf.sequence.col + 1,
+                "elements": sf.sequence.elements,
+                "name": sf.match.name,
+                "suggestion": sf.match.suggestion,
+            }
+        )
     return json.dumps(payload, indent=2)

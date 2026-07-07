@@ -127,6 +127,32 @@ plus the size of the space searched to find it. A 16-digit match on `pi/180` is
 near-certain; a 6-digit match on some elaborate combination is a coincidence and is
 suppressed. Tune the gate with `--min-surplus` (default 2.0, higher = stricter).
 
+## Whole-sequence recognition
+
+A single literal inside a data table (`>3` numeric elements) is deliberately
+never flagged on its own - most such tables are measured data, not constants.
+But a sequence where **every** element is independently exact is a different
+case, and worth surfacing as a unit:
+
+```
+$ exact rk4.py
+rk4.py:2:15  [0.16666666666666666, 0.3333333333333333, 0.3333333333333333, 0.16666666666666666]
+    = classic Runge-Kutta (RK4) weights
+    suggestion: [1 / 6, 1 / 3, 1 / 3, 1 / 6]
+
+1 exact sequence found (informational - not counted toward pass/fail):
+```
+
+A small library of iconic sequences from numerical methods (RK4 weights and
+nodes, Simpson's 3/8 rule, reciprocal factorials) gets a real name; anything
+else that's fully explained falls back to a generic label. The bar is strict:
+**one** unexplained element sinks the whole sequence, so this never fires on
+real data tables that merely contain a few round-looking numbers by chance.
+
+Sequence findings are informational only - they never affect the exit code and
+are not subject to `--baseline`, so adopting this update can never silently
+change a CI build's pass/fail result. Disable with `--no-sequences`.
+
 ## Context-aware suggestions
 
 When the literal sits inside an expression the AST can read, `exact` suggests the
@@ -258,6 +284,7 @@ exact [paths ...]        scan files or directories (default: .)
   --fix                  rewrite literals whose exact form is bit-identical
   --fix-truncated        also rewrite truncated table constants (changes values)
   --diff                 with --fix, print a unified diff instead of writing
+  --no-sequences         skip whole-sequence recognition (see below)
   --exit-zero            always exit 0, even with findings
   -v, --verbose          show counts of skipped literals
 ```
@@ -284,11 +311,13 @@ code-scanning setup required. Truncated constants are `::warning`, others are
 
 - Short literals (`0.5`, `1e-6`) - not enough evidence to claim anything.
 - Exactly representable fractions (`0.125`) - almost always intentional.
-- Values inside numeric data sequences - table data, not constants. This includes
-  short tuples/lists nested inside another container (an RGB triple inside a
-  colormap's list of triples, a coordinate pair inside a dict of named points) -
-  the nesting itself is the signal that it's a data table entry, even though the
-  inner tuple alone looks short enough to be "just a couple of constants".
+- Values inside numeric data sequences - table data, not constants, individually.
+  This includes short tuples/lists nested inside another container (an RGB triple
+  inside a colormap's list of triples, a coordinate pair inside a dict of named
+  points) - the nesting itself is the signal that it's a data table entry, even
+  though the inner tuple alone looks short enough to be "just a couple of
+  constants". A flat sequence where *every* element is independently exact is
+  still surfaced, as a whole unit - see "Whole-sequence recognition" above.
 - Empirical coefficients from curve fits - they satisfy no exact relation, and the
   evidence gate correctly rejects near-misses.
 
@@ -304,13 +333,8 @@ one finding out, and it's the real bug.
 
 ## Roadmap
 
-- **Context-aware suggestions**: rewrite `x * 0.017453...` as `math.radians(x)` and
-  `math.log(x) / math.log(2)` as `math.log2(x)`, using the surrounding expression.
-- `--fix` mode with conservative, language-aware rewrites.
 - Multi-language extraction via tree-sitter (JS, C, C++, Java).
-- SARIF output for GitHub code scanning.
-- Configuration via `[tool.exact]` in `pyproject.toml` (custom constants, thresholds,
-  per-path ignores).
+- PyPI release.
 
 ## Configuration
 

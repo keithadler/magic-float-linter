@@ -29,7 +29,7 @@ def test_cli_exit_zero_flag(tmp_path, capsys):
 def test_cli_json_output(tmp_path, capsys):
     (tmp_path / "p.py").write_text("K = 1.4426950408889634\n")
     code = main([str(tmp_path / "p.py"), "--json"])
-    data = json.loads(capsys.readouterr().out)
+    data = json.loads(capsys.readouterr().out)["findings"]
     assert code == 1
     assert len(data) == 1
     assert data[0]["form"] == "1/ln(2)"
@@ -101,7 +101,7 @@ def test_cli_jobs_output_identical(tmp_path, capsys):
     main([str(tmp_path), "--exit-zero", "--json", "--jobs", "2"])
     parallel = capsys.readouterr().out
     assert serial == parallel
-    assert len(json.loads(serial)) == 12
+    assert len(json.loads(serial)["findings"]) == 12
 
 
 def test_recognize_cache_shares_results():

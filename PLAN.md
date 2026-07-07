@@ -636,6 +636,58 @@ early. Manual review was 100% of non-test truncated findings rather than
 "every truncated + sample 30" - test-file findings are planted constants by
 definition and were spot-checked instead.
 
+### Whole-sequence recognition (list item 2 from the "10 things" brainstorm) [DONE 2026-07-07]
+**Goal:** close the biggest remaining blind spot - triage.py skips individual
+literals inside a >3-element numeric sequence outright ("inside a numeric
+data sequence"), on the theory that data tables aren't magic floats. A
+sequence where *every* element is independently exact (a Runge-Kutta weight
+vector, reciprocal factorials) is a different case and worth surfacing.
+**Files:** extract.py (NumericSequence dataclass + extraction, gated to flat,
+non-nested, pure-numeric containers), sequences.py (new module: per-element
+"trivial or recognized" gate, one unexplained element sinks the whole
+sequence; a small named-sequence library - RK4 weights/nodes, Simpson's 3/8,
+reciprocal factorials - checked before falling back to a generic label),
+cli.py/report.py/sarif.py (sequence findings threaded through as a parallel,
+clearly-separate list), tests/test_sequences.py, tests/test_sequences_cli.py.
+**Design decision - informational only:** sequence findings never affect the
+exit code and are not subject to `--baseline`, to avoid silently changing
+pass/fail behavior for any existing CI setup that adopts this update. They
+do respect `--changed-only`, `--no-sequences`, and are suppressed under
+`--truncation-only`/`--near-miss-only` (neither category fits). This was a
+deliberate compatibility-safety call, not an oversight.
+**Two real bugs caught before shipping, both via the actual regression
+workflow (stdlib scan + real corpus, not just the unit tests):**
+1. Simpson's 1/3 rule (3 elements) was in the named-sequence library but
+   `MIN_SEQUENCE_LENGTH` is 4 - an entry that can never match, same class of
+   mistake as the quadratic-tier evaluation. Removed rather than special-cased.
+2. `_agrees_with_fraction`'s tolerance formula (`10**(1-digits)`) is only
+   sound for literals with enough digits to be meaningful evidence; for a
+   1-significant-digit literal like `"0.05"` it produces a +/-1.0 absolute
+   tolerance, "agreeing" with nearly anything nearby. Caught on the stdlib
+   scan: `[0.05, 0.04, 0.03, 0.02, 0.01]` in test_sched.py was wrongly named
+   "reciprocal factorials". Fixed by requiring either bit-exact equality (any
+   digit count - no ambiguity there) or >=4 significant digits before the
+   tolerance formula applies.
+**A real crash caught the same way, in real (non-test-suite) circumstances:**
+whole-sequence extraction deliberately captures int elements too (so a
+mixed or all-int array like Simpson's `[1, 4, 1]` is handled), but numpy's
+source has a float16-bit-pattern lookup table with hex-int literals like
+`0x3c00`. `float("0x3c00")` raises ValueError, and that unparseable text
+flowed straight into `recognize()`, which had never needed to handle
+non-float-parseable input from any other caller - an uncaught crash scanning
+numpy for real. Fixed at the extraction boundary: any element whose source
+text isn't `float()`-parseable now voids the *whole* enclosing sequence
+(matching how any other non-numeric element is already handled), not a
+partial/wrong capture.
+**Validated:** 26 new tests (16 unit + 10 CLI integration). Full stdlib scan:
+one sequence finding, the same low-materiality "technically true" test
+placeholder case already characterized elsewhere in this project (not a new
+false-positive class). Real corpus re-scan (numpy, astropy, sympy, skimage)
+after both fixes: zero crashes, zero false positives - genuine finds include
+a numpy Chebyshev-extrema array (`[-1, -sqrt(2)/2, 0, sqrt(2)/2, 1]`) and
+sympy test files with truncated pi-multiple arrays
+(`[3.141592, 6.283185, 9.424777, 12.566370]` -> `[math.pi, math.tau, 3*math.pi, 4*math.pi]`).
+
 ---
 
 ## Step ordering notes for the executor
