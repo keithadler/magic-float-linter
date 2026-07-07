@@ -106,6 +106,12 @@ MATH_ENTRIES: tuple[ConstantEntry, ...] = (
     ConstantEntry("10/ln(10)", "10 / math.log(10)", "natural log to dB power"),
     ConstantEntry("10**(mpf(1)/20)", "10 ** (1 / 20)", "amplitude ratio for 1 dB"),
     ConstantEntry("10**(mpf(1)/10)", "10 ** (1 / 10)", "power ratio for 1 dB"),
+    ConstantEntry(
+        "10*ln(2)/ln(10)", "10 * math.log10(2)", "the famous 3 dB: the half/double-power point"
+    ),
+    ConstantEntry(
+        "20*ln(2)/ln(10)", "20 * math.log10(2)", "6 dB: amplitude doubling per octave"
+    ),
     ConstantEntry("2**(mpf(1)/12)", "2 ** (1 / 12)", "equal-temperament semitone ratio"),
     ConstantEntry("ln(2)/1200", "math.log(2) / 1200", "natural log per music cent"),
     ConstantEntry("1200/ln(2)", "1200 / math.log(2)", "music cents per natural log"),
@@ -123,6 +129,20 @@ MATH_ENTRIES: tuple[ConstantEntry, ...] = (
     ConstantEntry("cbrt(3)", "3 ** (1 / 3)"),
     ConstantEntry("sqrt(2)+1", "math.sqrt(2) + 1", "silver ratio"),
     ConstantEntry("sqrt(2)-1", "math.sqrt(2) - 1", "silver ratio conjugate; tan(pi/8)"),
+    # color science (CIE 1976 L*a*b*/L*u*v*). Written as mpf(n)/d rather than a
+    # bare n/d: two plain Python ints divide in float64 before mpf() ever sees
+    # the result, silently truncating a repeating decimal at double precision
+    # instead of the 60-digit precision every other entry here gets.
+    ConstantEntry(
+        "mpf(24389)/27",
+        "24389 / 27",
+        "CIE Lab kappa: linear-segment slope constant in CIELAB/CIELUV",
+    ),
+    ConstantEntry(
+        "mpf(216)/24389",
+        "216 / 24389",
+        "CIE Lab epsilon: linear/nonlinear threshold; equals (6/29)**3",
+    ),
     # statistics
     ConstantEntry(
         "sqrt(2)*erfinv(mpf('0.5'))",
@@ -236,7 +256,11 @@ PHYSICAL_ENTRIES: tuple[ConstantEntry, ...] = (
     ConstantEntry("light year", "scipy.constants.light_year", "m, exact", "9460730472580800"),
     # exactly-defined unit conversions
     ConstantEntry("pound to kg", "scipy.constants.pound", "exact", "0.45359237"),
+    ConstantEntry("inch to m", "scipy.constants.inch", "exact", "0.0254"),
+    ConstantEntry("foot to m", "scipy.constants.foot", "exact", "0.3048"),
+    ConstantEntry("yard to m", "scipy.constants.yard", "exact", "0.9144"),
     ConstantEntry("mile to m", "scipy.constants.mile", "exact", "1609.344"),
+    ConstantEntry("acre to m^2", "scipy.constants.acre", "exact", "4046.8564224"),
     ConstantEntry(
         "US gallon to liters", "1000 * scipy.constants.gallon", "exact", "3.785411784"
     ),

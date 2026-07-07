@@ -177,6 +177,42 @@ this repo itself (planted a real magic float in an uncommitted change,
 confirmed `--changed-only` caught exactly that line and nothing else, then
 reverted cleanly). 166 tests, ruff + self-lint clean.
 
+### Domain packs: dB/color-science + exact unit conversions (items 6+7) [DONE 2026-07-07]
+**Goal:** fast, low-risk table additions directly motivated by real corpus
+finds - the skimage 6/29 Lab-threshold bug and astropy's truncated imperial
+unit conversions.
+**Files:** constants.py (two new dB entries, CIE Lab kappa/epsilon, four new
+exact-unit-conversion entries), tests/test_domain_packs.py.
+**Added:** "3 dB"/"6 dB" (10\*log10(2), 20\*log10(2)) alongside the existing
+neper/dB entries; CIE Lab kappa (24389/27) and epsilon (216/24389, the
+(6/29)\*\*3 threshold); inch/foot/yard/acre-to-metric conversions.
+**Real bug found and fixed while adding kappa/epsilon:** wrote them first as
+decimal-string PHYSICAL_ENTRIES with only ~16 digits of precision. A bare
+Python `24389/27` inside `eval()` computes in float64 *before* `mpf()` ever
+wraps the result - silently truncating a repeating decimal at double
+precision instead of the 60-digit precision every other math entry gets.
+Caught by testing against an artificially high-precision literal before
+shipping (the same discipline used throughout this project: verify before
+trusting). Fixed by moving them to MATH_ENTRIES with `mpf(n)/d` wrapping,
+which forces the division itself to happen at full working precision.
+**Honest result on inch/foot/yard:** their exact decimal form is inherently
+short (3-4 significant figures - that IS the complete value), so they can
+never accumulate enough evidence to clear the default confidence gate
+against the full table (surplus ~0.8-1.8 vs. the 2.0 default). Same
+honestly-gated situation as the astropy neutrino correction: real, correct,
+recoverable via a lowered `--min-surplus`, not reachable by default. Kept
+rather than removed, since the cost to everyone else's surplus from a few
+more table rows is negligible (a few thousandths of a point) while the
+value to someone auditing with a lower threshold is real.
+**Validated:** 10 new tests; full stdlib scan unchanged at 54 findings, zero
+new false positives; re-scanned skimage (still exactly the one known 6/29
+finding) and astropy, which turned up a bonus, unrelated confirmation that
+the earlier log-space basis widening is paying off further: astropy's
+`TEMP_NEUTRINO = (4/11)**(1/3)` - sitting right next to the already-known
+neutrino-correction constant - is now also correctly recognized as
+`2**(2/3)*11**(-1/3)`, exactly matching its own source comment. 176 tests,
+ruff + self-lint clean.
+
 ## Ground rules for every step
 
 1. Run `.venv/bin/python -m pytest -q` and `.venv/bin/ruff check .` before every
