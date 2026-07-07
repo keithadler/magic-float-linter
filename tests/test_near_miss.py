@@ -84,7 +84,7 @@ def test_near_miss_in_json(tmp_path, capsys):
 
     (tmp_path / "m.py").write_text("x = 2.71827\n")
     main([str(tmp_path), "--json"])
-    data = json.loads(capsys.readouterr().out)
+    data = json.loads(capsys.readouterr().out)["findings"]
     assert data[0]["near_miss"] is True
     assert data[0]["form"] == "e"
 

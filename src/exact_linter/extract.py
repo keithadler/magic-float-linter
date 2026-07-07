@@ -18,8 +18,27 @@ class FileInfo:
     """Literals plus the import context suggestions should be rendered in."""
 
     literals: list[FloatLiteral]
+    sequences: list[NumericSequence] = field(default_factory=list)
     math_names: frozenset[str] = frozenset()  # from math import <name>, ...
     modules: frozenset[str] = frozenset()  # top-level modules imported
+
+
+@dataclass
+class NumericSequence:
+    """A flat list/tuple/set literal of pure numeric elements - a candidate
+    for whole-sequence recognition (see sequences.py: is every element an
+    exact rational or known constant, e.g. a Runge-Kutta weight vector?).
+
+    Individual elements inside a long sequence are also still extracted as
+    ordinary FloatLiteral objects and skipped by triage ("inside a numeric
+    data sequence") - this is a second, independent view of the same source
+    for a different kind of check, not a replacement for that skip.
+    """
+
+    elements: list[str]  # source text of each element, in order
+    file: Path
+    line: int
+    col: int
 
 
 @dataclass
@@ -114,6 +133,71 @@ def _operation(
     return op, ""
 
 
+def _float_parseable(text: str | None) -> str | None:
+    """`text` if Python's float() can parse it, else None.
+
+    An int constant is captured here too (see _sequence_element_text), so
+    its source text can be any int literal form: decimal ("42"), but also
+    hex/octal/binary ("0x3c00", a float16 bit pattern in a lookup table -
+    the real case this guard exists for). float() only understands decimal
+    text; passing it hex-int text raises ValueError deep inside downstream
+    code (recognize()) that assumes every string it receives is already
+    known-parseable. Rejecting here means the *whole* enclosing sequence is
+    left uncaptured, matching how any other non-numeric element is handled -
+    not a partial, silently-wrong capture.
+    """
+    if text is None:
+        return None
+    try:
+        float(text)
+    except ValueError:
+        return None
+    return text
+
+
+def _sequence_element_text(elt: ast.expr, source: str) -> str | None:
+    """Source text of `elt` if it is a plain numeric literal (int/float,
+    optionally sign-prefixed) whose text float() can parse, else None -
+    signaling "not a pure numeric sequence" to the caller, which then skips
+    capturing the whole container."""
+    node = elt
+    if isinstance(node, ast.UnaryOp) and isinstance(node.op, (ast.USub, ast.UAdd)):
+        inner = node.operand
+        if isinstance(inner, ast.Constant) and type(inner.value) in _NUMERIC:
+            return _float_parseable(ast.get_source_segment(source, node))
+        return None
+    if isinstance(node, ast.Constant) and type(node.value) in _NUMERIC:
+        return _float_parseable(ast.get_source_segment(source, node))
+    return None
+
+
+def _extract_sequences(
+    tree: ast.AST, parents: dict[ast.AST, ast.AST], source: str, file: Path
+) -> list[NumericSequence]:
+    sequences: list[NumericSequence] = []
+    for node in ast.walk(tree):
+        if not isinstance(node, (ast.List, ast.Tuple, ast.Set)) or not node.elts:
+            continue
+        # a short list/tuple nested inside another container (a list of RGB
+        # triples, a dict of coordinate pairs) is a data-table row, not a
+        # coefficient vector to name as a unit - same exclusion as
+        # _sequence_size uses for the per-element "inside a data sequence" skip
+        if isinstance(parents.get(node), _CONTAINERS):
+            continue
+        elements: list[str] = []
+        for elt in node.elts:
+            text = _sequence_element_text(elt, source)
+            if text is None:
+                elements = []
+                break
+            elements.append(text)
+        if elements:
+            sequences.append(
+                NumericSequence(elements=elements, file=file, line=node.lineno, col=node.col_offset)
+            )
+    return sequences
+
+
 def _is_suppressed(lineno: int, lines: list[str]) -> bool:
     """A literal is suppressed by a trailing comment on its own line, or by a
     comment-only line directly above it."""
@@ -178,14 +262,20 @@ def _collect_imports(tree: ast.AST) -> tuple[frozenset[str], frozenset[str]]:
 
 
 def extract_source_info(source: str, file: Path) -> FileInfo:
-    """Like extract_source, but also reports the file's import context."""
+    """Like extract_source, but also reports numeric sequences and the
+    file's import context."""
     literals = extract_source(source, file)
     try:
         tree = ast.parse(source)
     except (SyntaxError, ValueError):
         return FileInfo(literals)
+    parents: dict[ast.AST, ast.AST] = {}
+    for node in ast.walk(tree):
+        for child in ast.iter_child_nodes(node):
+            parents[child] = node
+    sequences = _extract_sequences(tree, parents, source, file)
     math_names, modules = _collect_imports(tree)
-    return FileInfo(literals, math_names=math_names, modules=modules)
+    return FileInfo(literals, sequences=sequences, math_names=math_names, modules=modules)
 
 
 def extract_file_info(path: Path) -> FileInfo:

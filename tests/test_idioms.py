@@ -63,7 +63,7 @@ def test_cli_renders_idiom(tmp_path, capsys):
 def test_cli_json_includes_idiom(tmp_path, capsys):
     (tmp_path / "geo.py").write_text("rad = deg * 0.017453292519943295\nPI = 3.141592653589793\n")
     main([str(tmp_path), "--exit-zero", "--json"])
-    data = json.loads(capsys.readouterr().out)
+    data = json.loads(capsys.readouterr().out)["findings"]
     by_literal = {d["literal"]: d for d in data}
     assert by_literal["0.017453292519943295"]["idiomatic"] == "math.radians(deg)"
     assert by_literal["3.141592653589793"]["idiomatic"] is None
