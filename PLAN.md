@@ -17,6 +17,33 @@ says it is independent. One step = one commit (or a few small commits).
   text+JSON reports ([report.py](src/exact_linter/report.py)).
 - 41 tests passing, ruff clean. Venv at .venv (Python 3.14).
 
+## Post-roadmap features (beyond the original 25 steps)
+
+### Near-miss / typo detection [DONE 2026-07-07]
+**Goal:** Flag literals that are close to a known constant but *wrong* (a written
+digit is incorrect), e.g. 2.71827 for e - a likely typo, a different and higher-value
+bug class than truncation. Chosen as the top "what else would people use this for"
+direction because it makes the tool a bug finder, not a style linter.
+**Files:** recognize.py (Match.near_miss, _is_near_miss + rounding/truncation
+helpers), report.py (LIKELY TYPO rendering, github warning), cli.py
+(--near-miss-only), tests/test_near_miss.py.
+**How:** A table match is a near-miss when the literal is neither the constant's
+correct rounding nor its truncation (chop) to the digits written, and isn't simply
+the nearest double. Implemented as a reclassification of existing table matches, so
+it adds no new findings - only better labels - preserving the zero-false-positive
+default. near_miss suppresses the truncated label (a wrong value isn't a faithful
+short one).
+**Two false-positive classes found and fixed during corpus validation:**
+- Full-precision machine literals a unit-in-the-last-place off a constant
+  (numpy's 0.70710678118654746 for sqrt(2)/2) are not typos. Gate: near-miss only
+  for literals with <= NEAR_MISS_MAX_DIGITS (12) significant figures.
+- Physical constants have legit historical revisions (astropy's CODATA-2010
+  8.3144621 vs the table's CODATA-2018 value) that look like typos of the current
+  value. Gate: near-miss only for mathematical constants (entry.decimal is None).
+**Validated:** stdlib scan flags exactly the 4 real 2.71827-for-e typos in
+test_random.py and nothing else; numpy near-misses 4->0 and astropy 6->0 after the
+two gates. 131 tests, ruff + self-lint clean.
+
 ## Ground rules for every step
 
 1. Run `.venv/bin/python -m pytest -q` and `.venv/bin/ruff check .` before every
