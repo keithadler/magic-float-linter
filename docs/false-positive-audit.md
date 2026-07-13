@@ -125,6 +125,16 @@ outcomes worth recording (2026-07-07):
   human has to know it's a port. The tool recognizes it; the judgment stays with
   the reader.
 
+## Scaled up: 100 packages
+
+This audit was later extended to **100** popular non-scientific packages - the
+same idea at more than an order of magnitude more code. Result: 99 scanned (one,
+ujson, is a C extension with no Python source), **one finding total**, and it is
+the same correct Django mile factor described above. Zero truncations, zero
+near-misses, zero false positives across 98 other large codebases. See
+[the 100-package audit](false-positive-audit-100.md) for the full package list
+and methodology.
+
 ## What this proves, and what it doesn't
 
 This confirms the confidence-surplus gate does not spam false positives on
