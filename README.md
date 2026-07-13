@@ -420,6 +420,11 @@ are numeric or scientific libraries, so almost nothing should fire. Five of the
 six produced zero findings. The one hit, in Django's GIS module, is a correct
 recognition of an exact conversion factor Django itself gets right (not a bug) -
 see [the false-positive audit](docs/false-positive-audit.md) for the full writeup.
+That audit was then scaled to [**100** popular non-scientific packages](docs/false-positive-audit-100.md) -
+frameworks, HTTP clients, ORMs, cloud SDKs, dev tools - and produced exactly
+**one** finding across all of them: the same correct Django factor. Ninety-eight
+other large codebases, zero findings; zero truncations, zero near-misses, zero
+false positives.
 
 The scan was later pushed into AI/ML code - [torch, transformers, jax, xgboost,
 keras, onnx and more](docs/ai-ml-corpus-study.md). Two more genuine, verified
