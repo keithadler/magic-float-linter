@@ -90,6 +90,17 @@ all grew substantially; this is effectively the tool's first "real" release.
   threshold tested. See `docs/confidence-calibration.md` and
   `scripts/calibration_sweep.py` (reproducible, `--quick` mode for a fast
   sanity check).
+- **Large-scale false-positive audit**: 100 popular non-scientific packages
+  (frameworks, HTTP clients, ORMs, cloud SDKs, dev tools) - one finding total,
+  a correct Django conversion factor. See `docs/false-positive-audit-100.md`.
+- **Scientific corpus study**: ~100 astronomy/physics/chemistry/DSP/geospatial/
+  finance packages. Established that a hand-typed truncated pi is the most
+  common genuine instance of this bug (pymatgen, pandas-ta, imgaug, sympy), and
+  surfaced two of the tool's own false-positive sources (older CODATA
+  revisions; coefficients of standard fitted approximations). Two findings
+  filed upstream: [sympy#30063](https://github.com/sympy/sympy/issues/30063)
+  and [pymatgen-core#89](https://github.com/materialsproject/pymatgen-core/issues/89).
+  See `docs/scientific-corpus-study.md`.
 
 ### Fixed
 

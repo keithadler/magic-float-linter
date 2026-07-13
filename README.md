@@ -435,11 +435,27 @@ confirmed still live on `main`), and ONNX's reference classifier writing
 the error sits far below float32's own precision - which the write-up says
 plainly rather than dressing them up.
 
-Underneath both of those sits the confidence-surplus formula itself, checked
+Finally the scan was pushed across ~100 scientific and numerical packages -
+astronomy, physics, chemistry, signal processing, geospatial, quant finance -
+[the domain the tool is actually for](docs/scientific-corpus-study.md). The
+clear pattern that fell out: **a hand-typed, truncated pi is the single most
+common genuine instance of this bug.** A bare `3.14159`/`3.141592` standing in
+for `math.pi` turned up independently in pymatgen (VASP optical-absorption
+math), pandas-ta (four Ehlers indicators), imgaug, and - as `0.0174533` for
+pi/180 - sympy. Two of those were reported upstream:
+[sympy#30063](https://github.com/sympy/sympy/issues/30063) and
+[pymatgen-core#89](https://github.com/materialsproject/pymatgen-core/issues/89).
+
+Underneath all of it sits the confidence-surplus formula itself, checked
 directly rather than just through its effects: [42,000 random literals](docs/confidence-calibration.md),
 and the empirical false-positive rate came in below the formula's own prediction
 at every threshold tested - including a close, honest look at every hit that
 landed anywhere near the default gate.
+
+**The honest bottom line.** Across 200+ packages scanned, the tool found ~11
+genuine truncated constants and exactly one that was *consequential* (sympy).
+The bug is common; the bug mattering is rare. That is not a knock on the tool -
+it is the accurate description of what it is. See "Scope and limitations" below.
 
 ## Scope and limitations
 
@@ -463,11 +479,23 @@ To set expectations honestly, before you run it:
   faithfulness to the spec outranks mathematical exactness. The tool recognizes
   these; a human has to supply the context. See the
   [false-positive audit](docs/false-positive-audit.md) for worked examples.
+- **Two known false-positive sources on scientific code** (surfaced by the
+  [scientific corpus study](docs/scientific-corpus-study.md), not yet fixed):
+  it flags **older CODATA revisions** it doesn't have registered, and
+  **individual coefficients of standard fitted approximations** (Abramowitz &
+  Stegun series, Lanczos, piecewise-linear convex relaxations) as "truncated" -
+  in both cases the value is correct in context and must not be changed. Expect
+  to hand-triage these when scanning physics/ML libraries.
+- **Near-miss detection can misfire on measured data.** A measured physical
+  quantity that happens to land near a math constant (a muon-tau mass ratio near
+  the semitone ratio; an electron affinity near phi-1) can read as a "typo." The
+  scientific corpus produced three such false positives.
 - **It lives where constants are hand-typed:** scientific, numerical, graphics,
   and ML code. On ordinary application code, crypto, and infrastructure it is -
-  correctly - almost entirely silent. Scanned across ~40 packages, it produced
-  two consequential-enough findings, a handful of low-impact ones, and no
-  false alarms on non-numerical code.
+  correctly - almost entirely silent. Across 200+ packages scanned, it produced
+  one consequential finding (sympy), ~10 genuine but low-impact truncations, and
+  no false alarms on non-numerical code. The bug is common; the bug *mattering*
+  is rare.
 - **Python only, for now** (multi-language extraction is on the roadmap), and
   it reads *literals in source* - not values computed at runtime, loaded from
   data, or produced by a fit.
